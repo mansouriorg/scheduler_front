@@ -42,4 +42,7 @@ export const api = {
   // --- COURSE OFFERINGS ---
   getOfferings: () => apiClient.get('/course-offerings').then(res => res.data),
   createOffering: (data: any) => apiClient.post('/course-offerings', data).then(res => res.data),
+
+  // --- SCHEDULER (THE BRAIN BRIDGE) ---
+  generateSchedule: () => apiClient.post('/scheduler/generate').then(res => res.data),
 };
