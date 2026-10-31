@@ -19,6 +19,8 @@ export const api = {
   // --- CLASSROOMS ---
   getRooms: () => apiClient.get('/rooms').then(res => res.data),
   createRoom: (data: any) => apiClient.post('/rooms', data).then(res => res.data),
+  updateRoom: (id: string, data: unknown) => apiClient.patch(`/rooms/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteRoom: (id: string) => apiClient.delete(`/rooms/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- COURSES ---
   getCourses: () => apiClient.get('/courses').then(res => res.data),

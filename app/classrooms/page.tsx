@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { buildFloorOptions, findFloorLabel, type FloorOption } from '@/lib/floor-options';
 import { api } from '@/lib/api'; 
@@ -43,11 +45,17 @@ export default function ClassroomsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // The room shown in the form for changes (null: the form adds a new room),
+  // and the room waiting in the "Delete?" window.
+  const [editing, setEditing] = useState<Room | null>(null);
+  const [toDelete, setToDelete] = useState<Room | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors },
   } = useForm<RoomFormValues>({
     resolver: zodResolver(roomSchema),
@@ -92,9 +100,14 @@ export default function ClassroomsPage() {
     setIsSubmitting(true);
     setNotice(null);
     try {
-      await api.createRoom(data); 
-
-      setNotice({ type: 'success', text: 'Room saved.' });
+      if (editing) {
+        await api.updateRoom(editing.id, data);
+        setNotice({ type: 'success', text: `${data.name} was updated.` });
+        setEditing(null);
+      } else {
+        await api.createRoom(data);
+        setNotice({ type: 'success', text: 'Room saved.' });
+      }
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
@@ -105,17 +118,64 @@ export default function ClassroomsPage() {
     }
   };
 
+  // Puts a room from the table into the form, to change it.
+  const startEdit = (room: Room) => {
+    setEditing(room);
+    setNotice(null);
+    reset({
+      name: room.name,
+      capacity: room.capacity,
+      roomType: room.roomType,
+      equipment: room.equipment,
+      floorId: room.floorId,
+    });
+    setFocus('name');
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    reset();
+  };
+
+  // Runs when "Delete" is confirmed in the window. The server refuses while
+  // classes are booked in the room; its message (why) is shown as it is.
+  const confirmDelete = async () => {
+    if (toDelete === null) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteRoom(toDelete.id);
+      setNotice({ type: 'success', text: `${toDelete.name} was deleted.` });
+      if (editing?.id === toDelete.id) cancelEdit();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not delete ${toDelete.name}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsDeleting(false);
+      setToDelete(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Classroom & Lab Management</h1>
         <Notice message={notice} onDismiss={setNotice} />
+        <ConfirmDialog
+          open={toDelete !== null}
+          title={`Delete ${toDelete?.name ?? 'this room'}?`}
+          message="This cannot be undone. A room that is booked for classes in the timetable cannot be deleted; you will see a message instead."
+          confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+          busy={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* LEFT COLUMN: THE FORM */}
           <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">Add New Space</h2>
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${editing.name}` : 'Add New Space'}</h2>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               
@@ -214,8 +274,17 @@ export default function ClassroomsPage() {
                 disabled={isSubmitting}
                 className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Save Classroom'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Save Classroom'}
               </button>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              )}
             </form>
           </div>
 
@@ -234,27 +303,28 @@ export default function ClassroomsPage() {
                     <th className="p-4 font-medium">Capacity</th>
                     <th className="p-4 font-medium">Location</th>
                     <th className="p-4 font-medium">Equipment</th>
+                    <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {isLoading ? (
-                    <StatusRow colSpan={5} message="Loading rooms..." />
+                    <StatusRow colSpan={6} message="Loading rooms..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={5}
+                      colSpan={6}
                       tone="error"
                       message={`Could not load the rooms. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : rooms.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-500">
+                      <td colSpan={6} className="p-8 text-center text-gray-500">
                         No rooms found. Add one to see them here!
                       </td>
                     </tr>
                   ) : (
                     rooms.map((room) => (
-                      <tr key={room.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={room.id} className={editing?.id === room.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
                         <td className="p-4 font-medium text-gray-900">{room.name}</td>
                         <td className="p-4 text-gray-600">
                           <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-purple-50 text-purple-700">
@@ -271,6 +341,28 @@ export default function ClassroomsPage() {
                               </span>
                             ))}
                             {room.equipment.length === 0 && <span className="text-gray-500 italic">None</span>}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(room)}
+                              aria-label={`Edit ${room.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setToDelete(room)}
+                              aria-label={`Delete ${room.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              Delete
+                            </button>
                           </div>
                         </td>
                       </tr>

@@ -41,7 +41,7 @@ Open http://localhost:3000.
 |---------------|---------------------------|-----------------------------------------------------|
 | `/`           | `app/page.tsx`            | see the timetable, filter by cohort, generate it    |
 | `/locations`  | `app/locations/page.tsx`  | add and list campuses, buildings and floors         |
-| `/classrooms` | `app/classrooms/page.tsx` | add and list rooms (capacity, type, floor, equipment) |
+| `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
 | `/courses`    | `app/courses/page.tsx`    | add and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add and list student groups and their headcount     |
@@ -54,9 +54,11 @@ Open http://localhost:3000.
 - Keyboard focus rings and the reduced-motion rule are in `app/globals.css`.
 - The colors and theme are in `app/globals.css`.
 - Shared parts (save messages, loading and error rows, the "Delete?" window) are in `components/`.
-- Teachers can be edited and deleted from their table. brain_server refuses to delete a
-  teacher who teaches classes, and the page shows its reason. `tests/row-actions.test.mjs`
-  checks that Edit and Delete buttons name the record and that deleting asks first.
+- Teachers and rooms can be edited and deleted from their tables. brain_server refuses to
+  delete a teacher who teaches classes or a room that classes are booked in, and to change
+  a room so that a booked class no longer fits (type, seats or equipment); the page shows
+  its reason. `tests/row-actions.test.mjs` checks that Edit and Delete buttons name the
+  record and that deleting asks first.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).
