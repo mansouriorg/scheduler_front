@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Notice, type NoticeMessage } from '@/components/notice';
+import { StatusRow } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; 
 
 // 1. Zod Validation Schema (Cleaned up for strict TypeScript matching)
@@ -25,11 +30,20 @@ export default function TeachersPage() {
   
   // This state acts as a trigger. Whenever it changes, we re-fetch the list!
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // The teacher shown in the form for changes (null: the form adds a new teacher),
+  // and the teacher waiting in the "Delete?" window.
+  const [editing, setEditing] = useState<Teacher | null>(null);
+  const [toDelete, setToDelete] = useState<Teacher | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors },
   } = useForm<TeacherFormValues>({
     resolver: zodResolver(teacherSchema),
@@ -44,96 +58,180 @@ export default function TeachersPage() {
       try {
         const data = await api.getTeachers(); 
         setTeachers(data);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch teachers. Is the backend running?', error);
+        setLoadError(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchTeachers();
   }, [refreshTrigger]);
 
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   // 3. Handle Form Submission using Axios API client
   const onSubmit = async (data: TeacherFormValues) => {
     setIsSubmitting(true);
+    setNotice(null);
     try {
-      await api.createTeacher(data); 
-
-      alert('Teacher added successfully!');
+      if (editing) {
+        await api.updateTeacher(editing.id, data);
+        setNotice({ type: 'success', text: `${data.name} was updated.` });
+        setEditing(null);
+      } else {
+        await api.createTeacher(data);
+        setNotice({ type: 'success', text: 'Teacher saved.' });
+      }
       reset(); // Clear the form inputs
       setRefreshTrigger((prev) => prev + 1); // Trigger the useEffect to refresh the table
     } catch (error) {
       console.error(error);
-      alert('Network error. Is your backend running?');
+      setNotice({ type: 'error', text: `Could not save the teacher. ${getErrorMessage(error)}` });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Puts a teacher from the table into the form, to change it.
+  const startEdit = (teacher: Teacher) => {
+    setEditing(teacher);
+    setNotice(null);
+    reset({
+      name: teacher.name,
+      department: teacher.department,
+      maxHoursPerWeek: teacher.maxHoursPerWeek,
+      timePreference: teacher.timePreference,
+    });
+    setFocus('name');
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    reset();
+  };
+
+  // Runs when "Delete" is confirmed in the window. The server refuses while the
+  // teacher has classes; its message (why, and what to do) is shown as it is.
+  const confirmDelete = async () => {
+    if (toDelete === null) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteTeacher(toDelete.id);
+      setNotice({ type: 'success', text: `${toDelete.name} was deleted.` });
+      if (editing?.id === toDelete.id) cancelEdit();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not delete ${toDelete.name}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsDeleting(false);
+      setToDelete(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Teacher Management</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Teacher Management</h1>
+        <Notice message={notice} onDismiss={setNotice} />
+        <ConfirmDialog
+          open={toDelete !== null}
+          title={`Delete ${toDelete?.name ?? 'this teacher'}?`}
+          message="This cannot be undone. A teacher who teaches classes cannot be deleted; you will see a message instead."
+          confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+          busy={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* LEFT COLUMN: THE FORM */}
           <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">Add New Teacher</h2>
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${editing.name}` : 'Add New Teacher'}</h2>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label htmlFor="teacher-name" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                 <input
                   {...register('name')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="teacher-name"
+                  aria-invalid={errors.name ? true : undefined}
+                  aria-describedby={errors.name ? 'teacher-name-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. Dr. Jane Smith"
                 />
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+                {errors.name && <p id="teacher-name-error" className="mt-1 text-xs font-medium text-red-700">{errors.name.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                <label htmlFor="teacher-department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                 <input
                   {...register('department')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="teacher-department"
+                  aria-invalid={errors.department ? true : undefined}
+                  aria-describedby={errors.department ? 'teacher-department-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. Computer Science"
                 />
-                {errors.department && <p className="text-red-500 text-xs mt-1">{errors.department.message}</p>}
+                {errors.department && <p id="teacher-department-error" className="mt-1 text-xs font-medium text-red-700">{errors.department.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max Teaching Hours / Week</label>
+                <label htmlFor="teacher-max-hours-per-week" className="block text-sm font-medium text-gray-700 mb-1">Max Teaching Hours / Week</label>
                 <input
                   type="number"
                   // Added valueAsNumber: true to ensure RHF passes a pure number to Zod
                   {...register('maxHoursPerWeek', { valueAsNumber: true })}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="teacher-max-hours-per-week"
+                  aria-invalid={errors.maxHoursPerWeek ? true : undefined}
+                  aria-describedby={errors.maxHoursPerWeek ? 'teacher-max-hours-per-week-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. 18"
                 />
-                {errors.maxHoursPerWeek && <p className="text-red-500 text-xs mt-1">{errors.maxHoursPerWeek.message}</p>}
+                {errors.maxHoursPerWeek && <p id="teacher-max-hours-per-week-error" className="mt-1 text-xs font-medium text-red-700">{errors.maxHoursPerWeek.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time Preference</label>
+                <label htmlFor="teacher-time-preference" className="block text-sm font-medium text-gray-700 mb-1">Time Preference</label>
                 <select
                   {...register('timePreference')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  id="teacher-time-preference"
+                  aria-invalid={errors.timePreference ? true : undefined}
+                  aria-describedby={errors.timePreference ? 'teacher-time-preference-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="NO_PREFERENCE">No Preference</option>
                   <option value="MORNING">Morning (08:00 - 12:00)</option>
                   <option value="AFTERNOON">Afternoon (13:00 - 17:00)</option>
                   <option value="EVENING">Evening (17:00+)</option>
                 </select>
-                {errors.timePreference && <p className="text-red-500 text-xs mt-1">{errors.timePreference.message}</p>}
+                {errors.timePreference && <p id="teacher-time-preference-error" className="mt-1 text-xs font-medium text-red-700">{errors.timePreference.message}</p>}
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 mt-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Save Teacher'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Save Teacher'}
               </button>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              )}
             </form>
           </div>
 
@@ -151,18 +249,28 @@ export default function TeachersPage() {
                     <th className="p-4 font-medium">Department</th>
                     <th className="p-4 font-medium">Max Hours</th>
                     <th className="p-4 font-medium">Preference</th>
+                    <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
-                  {teachers.length === 0 ? (
+                  {isLoading ? (
+                    <StatusRow colSpan={5} message="Loading teachers..." />
+                  ) : loadError ? (
+                    <StatusRow
+                      colSpan={5}
+                      tone="error"
+                      message={`Could not load the teachers. ${loadError}`}
+                      onRetry={retryLoad}
+                    />
+                  ) : teachers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-gray-500">
+                      <td colSpan={5} className="p-8 text-center text-gray-500">
                         No teachers found. Add one to see them here!
                       </td>
                     </tr>
                   ) : (
                     teachers.map((teacher) => (
-                      <tr key={teacher.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={teacher.id} className={editing?.id === teacher.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
                         <td className="p-4 font-medium text-gray-900">{teacher.name}</td>
                         <td className="p-4 text-gray-600">{teacher.department}</td>
                         <td className="p-4 text-gray-600">{teacher.maxHoursPerWeek} hrs</td>
@@ -170,6 +278,28 @@ export default function TeachersPage() {
                           <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
                             {teacher.timePreference.replace('_', ' ')}
                           </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(teacher)}
+                              aria-label={`Edit ${teacher.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setToDelete(teacher)}
+                              aria-label={`Delete ${teacher.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Notice, type NoticeMessage } from '@/components/notice';
+import { StatusBlock } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
 import { api } from '@/lib/api'; // <-- 1. Import the API client
 
 // 1. Zod Validation Schemas
@@ -32,6 +35,9 @@ export default function LocationsPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [floors, setFloors] = useState<Floor[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage | null>(null);
 
   // Form Hooks for Campus
   const { register: regCampus, handleSubmit: subCampus, reset: resetCampus, formState: { errors: errCampus, isSubmitting: isSubmittingCampus } } = useForm<z.infer<typeof campusSchema>>({ resolver: zodResolver(campusSchema) });
@@ -46,27 +52,38 @@ export default function LocationsPage() {
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        // Use Promise.all with our clean API methods, and catch errors individually
-        // so if one fails, the others still load.
+        // Load the three lists together. If one request fails, the page says so
+        // instead of showing empty lists.
         const [campusData, buildingData, floorData] = await Promise.all([
-          api.getCampuses().catch(() => []),
-          api.getBuildings().catch(() => []),
-          api.getFloors().catch(() => []),
+          api.getCampuses(),
+          api.getBuildings(),
+          api.getFloors(),
         ]);
 
         setCampuses(campusData);
         setBuildings(buildingData);
         setFloors(floorData);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch location data', error);
+        setLoadError(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchLocations();
   }, [refreshTrigger]);
 
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   // 3. Dynamic Submit Handler
   // We use the string literal type to ensure we only call valid API endpoints
-  const onSubmit = async (endpoint: 'Campus' | 'Building' | 'Floor', data: any, resetFunc: () => void) => {
+  const onSubmit = async (endpoint: 'Campus' | 'Building' | 'Floor', data: Record<string, string>, resetFunc: () => void) => {
+    setNotice(null);
     try {
       // Dynamically call the correct api method based on the string passed
       if (endpoint === 'Campus') await api.createCampus(data);
@@ -74,17 +91,19 @@ export default function LocationsPage() {
       if (endpoint === 'Floor') await api.createFloor(data);
 
       resetFunc(); // Clear the specific form
+      setNotice({ type: 'success', text: `${endpoint} saved.` });
       setRefreshTrigger((prev) => prev + 1); // Refresh all data tables and dropdowns
     } catch (error) {
       console.error(error);
-      alert(`Network error. Is your NestJS backend running?`);
+      setNotice({ type: 'error', text: `Could not save the ${endpoint.toLowerCase()}. ${getErrorMessage(error)}` });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Location & Facility Management</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Location & Facility Management</h1>
+        <Notice message={notice} onDismiss={setNotice} />
 
         {/* FORMS ROW */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -94,11 +113,11 @@ export default function LocationsPage() {
             <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">1. Add Campus</h2>
             <form onSubmit={subCampus((data) => onSubmit('Campus', data, resetCampus))} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Campus Name</label>
-                <input {...regCampus('name')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border" placeholder="e.g. North Campus" />
-                {errCampus.name && <p className="text-red-500 text-xs mt-1">{errCampus.name.message}</p>}
+                <label htmlFor="campus-name" className="block text-sm font-medium text-gray-700 mb-1">Campus Name</label>
+                <input {...regCampus('name')} id="campus-name" aria-invalid={errCampus.name ? true : undefined} aria-describedby={errCampus.name ? 'campus-name-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm" placeholder="e.g. North Campus" />
+                {errCampus.name && <p id="campus-name-error" className="mt-1 text-xs font-medium text-red-700">{errCampus.name.message}</p>}
               </div>
-              <button type="submit" disabled={isSubmittingCampus} className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Save Campus</button>
+              <button type="submit" disabled={isSubmittingCampus} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Save Campus</button>
             </form>
           </div>
 
@@ -107,26 +126,26 @@ export default function LocationsPage() {
             <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">2. Add Building</h2>
             <form onSubmit={subBuilding((data) => onSubmit('Building', data, resetBuilding))} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Campus</label>
-                <select {...regBuilding('campusId')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border bg-white">
+                <label htmlFor="building-campus-id" className="block text-sm font-medium text-gray-700 mb-1">Select Campus</label>
+                <select {...regBuilding('campusId')} id="building-campus-id" aria-invalid={errBuilding.campusId ? true : undefined} aria-describedby={errBuilding.campusId ? 'building-campus-id-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm">
                   <option value="">-- Choose a Campus --</option>
                   {campuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                {errBuilding.campusId && <p className="text-red-500 text-xs mt-1">{errBuilding.campusId.message}</p>}
+                {errBuilding.campusId && <p id="building-campus-id-error" className="mt-1 text-xs font-medium text-red-700">{errBuilding.campusId.message}</p>}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Building Name</label>
-                  <input {...regBuilding('name')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border" placeholder="e.g. Science Hub" />
-                  {errBuilding.name && <p className="text-red-500 text-xs mt-1">{errBuilding.name.message}</p>}
+                  <label htmlFor="building-name" className="block text-sm font-medium text-gray-700 mb-1">Building Name</label>
+                  <input {...regBuilding('name')} id="building-name" aria-invalid={errBuilding.name ? true : undefined} aria-describedby={errBuilding.name ? 'building-name-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm" placeholder="e.g. Science Hub" />
+                  {errBuilding.name && <p id="building-name-error" className="mt-1 text-xs font-medium text-red-700">{errBuilding.name.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Short Code</label>
-                  <input {...regBuilding('code')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border" placeholder="e.g. SCI" />
-                  {errBuilding.code && <p className="text-red-500 text-xs mt-1">{errBuilding.code.message}</p>}
+                  <label htmlFor="building-code" className="block text-sm font-medium text-gray-700 mb-1">Short Code</label>
+                  <input {...regBuilding('code')} id="building-code" aria-invalid={errBuilding.code ? true : undefined} aria-describedby={errBuilding.code ? 'building-code-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm" placeholder="e.g. SCI" />
+                  {errBuilding.code && <p id="building-code-error" className="mt-1 text-xs font-medium text-red-700">{errBuilding.code.message}</p>}
                 </div>
               </div>
-              <button type="submit" disabled={isSubmittingBuilding || campuses.length === 0} className="w-full py-2 px-4 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition disabled:opacity-50">Save Building</button>
+              <button type="submit" disabled={isSubmittingBuilding || campuses.length === 0} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Save Building</button>
             </form>
           </div>
 
@@ -135,19 +154,19 @@ export default function LocationsPage() {
             <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">3. Add Floor</h2>
             <form onSubmit={subFloor((data) => onSubmit('Floor', data, resetFloor))} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Building</label>
-                <select {...regFloor('buildingId')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border bg-white">
+                <label htmlFor="floor-building-id" className="block text-sm font-medium text-gray-700 mb-1">Select Building</label>
+                <select {...regFloor('buildingId')} id="floor-building-id" aria-invalid={errFloor.buildingId ? true : undefined} aria-describedby={errFloor.buildingId ? 'floor-building-id-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm">
                   <option value="">-- Choose a Building --</option>
                   {buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
                 </select>
-                {errFloor.buildingId && <p className="text-red-500 text-xs mt-1">{errFloor.buildingId.message}</p>}
+                {errFloor.buildingId && <p id="floor-building-id-error" className="mt-1 text-xs font-medium text-red-700">{errFloor.buildingId.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Floor Level</label>
-                <input {...regFloor('level')} className="w-full rounded-lg border-gray-300 shadow-sm p-2 border" placeholder="e.g. Ground, 1, 2, Basement" />
-                {errFloor.level && <p className="text-red-500 text-xs mt-1">{errFloor.level.message}</p>}
+                <label htmlFor="floor-level" className="block text-sm font-medium text-gray-700 mb-1">Floor Level</label>
+                <input {...regFloor('level')} id="floor-level" aria-invalid={errFloor.level ? true : undefined} aria-describedby={errFloor.level ? 'floor-level-error' : undefined} className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm" placeholder="e.g. Ground, 1, 2, Basement" />
+                {errFloor.level && <p id="floor-level-error" className="mt-1 text-xs font-medium text-red-700">{errFloor.level.message}</p>}
               </div>
-              <button type="submit" disabled={isSubmittingFloor || buildings.length === 0} className="w-full py-2 px-4 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition disabled:opacity-50">Save Floor</button>
+              <button type="submit" disabled={isSubmittingFloor || buildings.length === 0} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Save Floor</button>
             </form>
           </div>
 
@@ -159,7 +178,15 @@ export default function LocationsPage() {
             <h2 className="text-xl font-semibold text-gray-800">Current Infrastructure Tree</h2>
           </div>
           <div className="p-6">
-            {campuses.length === 0 ? (
+            {isLoading ? (
+              <StatusBlock message="Loading locations..." />
+            ) : loadError ? (
+              <StatusBlock
+                tone="error"
+                message={`Could not load the locations. ${loadError}`}
+                onRetry={retryLoad}
+              />
+            ) : campuses.length === 0 ? (
               <p className="text-gray-500 text-center py-4">No locations defined yet. Start by adding a Campus above!</p>
             ) : (
               <div className="space-y-6">
@@ -177,13 +204,13 @@ export default function LocationsPage() {
                               </span>
                             ))}
                             {floors.filter(f => f.buildingId === building.id).length === 0 && (
-                              <span className="text-xs text-gray-400 italic">No floors added yet</span>
+                              <span className="text-xs text-gray-500 italic">No floors added yet</span>
                             )}
                           </div>
                         </div>
                       ))}
                       {buildings.filter(b => b.campusId === campus.id).length === 0 && (
-                        <span className="text-sm text-gray-400 italic">No buildings added to this campus yet.</span>
+                        <span className="text-sm text-gray-500 italic">No buildings added to this campus yet.</span>
                       )}
                     </div>
                   </div>

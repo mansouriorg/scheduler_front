@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# university-scheduler-web
 
-## Getting Started
+The admin website of the university scheduler, built with Next.js 16 (App Router),
+React 19 and Tailwind CSS 4. Staff enter the data a timetable needs (locations,
+rooms, teachers, courses, cohorts, terms and course offerings) and generate the
+weekly timetable. All data is stored by brain_server, the NestJS API.
 
-First, run the development server:
+## Requirements
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js and npm (developed with Node.js 24.19 and npm 11.17)
+- brain_server running, by default on http://localhost:3001
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Run these once, inside this folder:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+    npm install
+    cp .env.example .env.local
 
-## Learn More
+Then check `NEXT_PUBLIC_API_URL` in `.env.local`. A plain `.env` file works too.
 
-To learn more about Next.js, take a look at the following resources:
+## Run
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    npm run dev
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open http://localhost:3000.
 
-## Deploy on Vercel
+## Settings
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Name                  | Meaning                 | Default                 |
+|-----------------------|-------------------------|-------------------------|
+| `NEXT_PUBLIC_API_URL` | address of brain_server | `http://localhost:3001` |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js copies `NEXT_PUBLIC_` values into the browser code when the dev server
+  starts or when you build, so restart `npm run dev` (or build again) after a change.
+- brain_server must allow this site's address in its `CORS_ORIGIN` setting.
+
+## Pages
+
+| Path          | File                      | What you do there                                   |
+|---------------|---------------------------|-----------------------------------------------------|
+| `/`           | `app/page.tsx`            | see the timetable, filter by cohort, generate it    |
+| `/locations`  | `app/locations/page.tsx`  | add and list campuses, buildings and floors         |
+| `/classrooms` | `app/classrooms/page.tsx` | add and list rooms (capacity, type, floor, equipment) |
+| `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
+| `/courses`    | `app/courses/page.tsx`    | add and list courses: credits, hours, lecture/TD/TP parts |
+| `/cohorts`    | `app/cohorts/page.tsx`    | add and list student groups and their headcount     |
+| `/terms`      | `app/terms/page.tsx`      | add and list academic terms and their dates         |
+| `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term    |
+
+- The API calls are in `lib/api.ts`.
+- The sidebar and the phone menu are in `components/app-sidebar.tsx`; the page frame
+  (skip link, main area) is in `app/layout.tsx`.
+- Keyboard focus rings and the reduced-motion rule are in `app/globals.css`.
+- The colors and theme are in `app/globals.css`.
+- Shared parts (save messages, loading and error rows, the "Delete?" window) are in `components/`.
+- Teachers can be edited and deleted from their table. brain_server refuses to delete a
+  teacher who teaches classes, and the page shows its reason. `tests/row-actions.test.mjs`
+  checks that Edit and Delete buttons name the record and that deleting asks first.
+- `lib/api-error.ts` turns API errors into readable sentences.
+- Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
+- `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).
+- `lib/floor-options.ts` names the floors ("Building (CODE) - Level X") for the room form and table.
+- Every page shows a loading state, a load error with "Try again", and a message after each save.
+
+## Style rules
+
+Use the same Tailwind classes on every page so the app stays consistent:
+
+| Element        | Classes |
+|----------------|---------|
+| Page wrapper   | `min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8` |
+| Page title     | `mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl` |
+| Input / select | `w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm` |
+| Checkbox       | `h-4 w-4 rounded border-gray-500 accent-blue-600` |
+| Field error    | `mt-1 text-xs font-medium text-red-700` |
+| Save button    | `w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50` |
+
+Text must reach a contrast of 4.5:1 (field borders 3:1): on white, use gray-500 or darker for
+small text, and red-700, green-700 or orange-700 for colored text.
+
+Every field needs an `id`, and its label `htmlFor` with the same value. Its error message gets
+`id="FIELD-error"`, and the field `aria-describedby` pointing at it while the error is shown.
+`tests/form-labels.test.mjs` checks this on every form page.
+
+## Scripts
+
+| Command         | What it does                        |
+|-----------------|-------------------------------------|
+| `npm run dev`   | development server with live reload |
+| `npm run build` | production build                    |
+| `npm start`     | run the production build            |
+| `npm run lint`  | ESLint                              |
+| `npm test`      | unit tests (Node.js test runner)    |

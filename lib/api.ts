@@ -13,6 +13,8 @@ export const api = {
   // --- TEACHERS ---
   getTeachers: () => apiClient.get('/professors').then(res => res.data),
   createTeacher: (data: any) => apiClient.post('/professors', data).then(res => res.data),
+  updateTeacher: (id: string, data: unknown) => apiClient.patch(`/professors/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteTeacher: (id: string) => apiClient.delete(`/professors/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- CLASSROOMS ---
   getRooms: () => apiClient.get('/rooms').then(res => res.data),

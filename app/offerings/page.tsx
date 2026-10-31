@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Notice, type NoticeMessage } from '@/components/notice';
+import { StatusBlock } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
 import { api } from '@/lib/api'; // <-- Import your centralized API client
 
 // 1. Zod Validation Schema
@@ -23,6 +26,9 @@ export default function CourseOfferingsPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage | null>(null);
 
   const {
     register,
@@ -37,46 +43,59 @@ export default function CourseOfferingsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Promise.all lets us fetch all four datasets at the exact same time!
+        // Load the four lists together. If one request fails, the page says so
+        // instead of showing empty lists.
         const [termData, courseData, cohortData, offeringData] = await Promise.all([
-          api.getTerms().catch(() => []),
-          api.getCourses().catch(() => []),
-          api.getCohorts().catch(() => []),
-          api.getOfferings().catch(() => []),
+          api.getTerms(),
+          api.getCourses(),
+          api.getCohorts(),
+          api.getOfferings(),
         ]);
 
         setTerms(termData);
         setCourses(courseData);
         setCohorts(cohortData);
         setOfferings(offeringData);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch data', error);
+        setLoadError(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchData();
   }, [refreshTrigger]);
 
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   // 3. Handle Form Submission
   const onSubmit = async (data: OfferingFormValues) => {
     setIsSubmitting(true);
+    setNotice(null);
     try {
       await api.createOffering(data); // <-- Clean POST request
 
-      alert('Course Assigned! Schedulable class blocks have been successfully generated.');
+      setNotice({ type: 'success', text: 'Course assigned. Its class blocks are ready to be scheduled.' });
       reset();
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error(error);
-      alert('Failed to assign course. Is the backend running?');
+      setNotice({ type: 'error', text: `Could not assign the course. ${getErrorMessage(error)}` });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Assign Courses to Cohorts</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Assign Courses to Cohorts</h1>
+        <Notice message={notice} onDismiss={setNotice} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -86,45 +105,54 @@ export default function CourseOfferingsPage() {
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Academic Term</label>
+                <label htmlFor="offering-term-id" className="block text-sm font-medium text-gray-700 mb-1">Academic Term</label>
                 <select 
                   {...register('termId')} 
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border bg-white focus:ring-blue-500 focus:border-blue-500"
+                  id="offering-term-id"
+                  aria-invalid={errors.termId ? true : undefined}
+                  aria-describedby={errors.termId ? 'offering-term-id-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="">-- Select Term --</option>
                   {terms.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-                {errors.termId && <p className="text-red-500 text-xs mt-1">{errors.termId.message}</p>}
+                {errors.termId && <p id="offering-term-id-error" className="mt-1 text-xs font-medium text-red-700">{errors.termId.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Student Cohort</label>
+                <label htmlFor="offering-cohort-id" className="block text-sm font-medium text-gray-700 mb-1">Student Cohort</label>
                 <select 
                   {...register('cohortId')} 
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border bg-white focus:ring-blue-500 focus:border-blue-500"
+                  id="offering-cohort-id"
+                  aria-invalid={errors.cohortId ? true : undefined}
+                  aria-describedby={errors.cohortId ? 'offering-cohort-id-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="">-- Select Group --</option>
                   {cohorts.map(c => <option key={c.id} value={c.id}>{c.name} ({c.headcount} students)</option>)}
                 </select>
-                {errors.cohortId && <p className="text-red-500 text-xs mt-1">{errors.cohortId.message}</p>}
+                {errors.cohortId && <p id="offering-cohort-id-error" className="mt-1 text-xs font-medium text-red-700">{errors.cohortId.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
+                <label htmlFor="offering-course-id" className="block text-sm font-medium text-gray-700 mb-1">Course</label>
                 <select 
                   {...register('courseId')} 
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border bg-white focus:ring-blue-500 focus:border-blue-500"
+                  id="offering-course-id"
+                  aria-invalid={errors.courseId ? true : undefined}
+                  aria-describedby={errors.courseId ? 'offering-course-id-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="">-- Select Course --</option>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.code}: {c.title}</option>)}
                 </select>
-                {errors.courseId && <p className="text-red-500 text-xs mt-1">{errors.courseId.message}</p>}
+                {errors.courseId && <p id="offering-course-id-error" className="mt-1 text-xs font-medium text-red-700">{errors.courseId.message}</p>}
               </div>
 
               <button 
                 type="submit" 
                 disabled={isSubmitting} 
-                className="w-full py-2.5 px-4 mt-6 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? 'Generating Blocks...' : 'Assign & Generate Blocks'}
               </button>
@@ -138,7 +166,15 @@ export default function CourseOfferingsPage() {
             </div>
             
             <div className="p-6 space-y-4 max-h-[700px] overflow-y-auto">
-              {offerings.length === 0 ? (
+              {isLoading ? (
+                <StatusBlock message="Loading assignments..." />
+              ) : loadError ? (
+                <StatusBlock
+                  tone="error"
+                  message={`Could not load the assignments. ${loadError}`}
+                  onRetry={retryLoad}
+                />
+              ) : offerings.length === 0 ? (
                 <p className="text-gray-500 text-center">No assignments yet. Link a course to a cohort above.</p>
               ) : (
                 offerings.map((offering) => (
@@ -147,7 +183,7 @@ export default function CourseOfferingsPage() {
                       <div>
                         <h3 className="font-bold text-lg text-gray-900">{offering.course.code} - {offering.course.title}</h3>
                         <p className="text-sm font-medium text-blue-600">
-                          {offering.cohort.name} <span className="text-gray-400 font-normal">({offering.cohort.headcount} students)</span>
+                          {offering.cohort.name} <span className="text-gray-500 font-normal">({offering.cohort.headcount} students)</span>
                         </p>
                       </div>
                       <span className="bg-indigo-50 text-indigo-700 text-xs px-2 py-1 rounded font-bold border border-indigo-100">
@@ -161,7 +197,7 @@ export default function CourseOfferingsPage() {
                         {offering.classes.map((cls: any) => (
                           <div key={cls.id} className="bg-orange-50 text-orange-800 border border-orange-200 rounded px-3 py-1.5 text-xs font-medium flex items-center shadow-sm">
                             <span className="font-bold mr-1">{cls.type}:</span> {cls.durationMinutes} mins 
-                            <span className="ml-2 text-orange-600/70">({cls.requiresRoomType})</span>
+                            <span className="ml-2 text-orange-700">({cls.requiresRoomType})</span>
                           </div>
                         ))}
                       </div>

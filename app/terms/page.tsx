@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Notice, type NoticeMessage } from '@/components/notice';
+import { StatusRow } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
 import { api } from '@/lib/api'; // <-- 1. Import the API client
 
 // 1. Zod Validation Schema with Date Logic
@@ -27,6 +30,9 @@ export default function TermsPage() {
   const [terms, setTerms] = useState<Term[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage | null>(null);
 
   const {
     register,
@@ -48,16 +54,27 @@ export default function TermsPage() {
         // Sort terms by start date so the newest is at the top
         const sorted = data.sort((a: Term, b: Term) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
         setTerms(sorted);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch terms', error);
+        setLoadError(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchTerms();
   }, [refreshTrigger]);
 
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   // 3. Handle Form Submission using Axios API
   const onSubmit = async (data: TermFormValues) => {
     setIsSubmitting(true);
+    setNotice(null);
     try {
       // Prisma requires standard ISO DateTime strings, so we convert them before sending
       const payload = {
@@ -68,12 +85,12 @@ export default function TermsPage() {
 
       await api.createTerm(payload); // <-- Clean POST request
 
-      alert('Academic Term added successfully!');
+      setNotice({ type: 'success', text: 'Term saved.' });
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error(error);
-      alert('Network error. Is your NestJS backend running?');
+      setNotice({ type: 'error', text: `Could not save the term. ${getErrorMessage(error)}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -89,9 +106,10 @@ export default function TermsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Academic Terms</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Academic Terms</h1>
+        <Notice message={notice} onDismiss={setNotice} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -102,20 +120,24 @@ export default function TermsPage() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term Name</label>
+                <label htmlFor="term-name" className="block text-sm font-medium text-gray-700 mb-1">Term Name</label>
                 <input
                   {...register('name')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="term-name"
+                  aria-invalid={errors.name ? true : undefined}
+                  aria-describedby={errors.name ? 'term-name-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. Academic Year 26/27 - Fall"
                 />
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+                {errors.name && <p id="term-name-error" className="mt-1 text-xs font-medium text-red-700">{errors.name.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term Type</label>
+                <label htmlFor="term-type" className="block text-sm font-medium text-gray-700 mb-1">Term Type</label>
                 <select
                   {...register('type')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  id="term-type"
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="SEMESTER_1">Semester 1 (Fall)</option>
                   <option value="SEMESTER_2">Semester 2 (Spring)</option>
@@ -125,30 +147,36 @@ export default function TermsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <label htmlFor="term-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                   <input
                     type="date"
                     {...register('startDate')}
-                    className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                    id="term-start-date"
+                    aria-invalid={errors.startDate ? true : undefined}
+                    aria-describedby={errors.startDate ? 'term-start-date-error' : undefined}
+                    className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   />
-                  {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate.message}</p>}
+                  {errors.startDate && <p id="term-start-date-error" className="mt-1 text-xs font-medium text-red-700">{errors.startDate.message}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <label htmlFor="term-end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                   <input
                     type="date"
                     {...register('endDate')}
-                    className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                    id="term-end-date"
+                    aria-invalid={errors.endDate ? true : undefined}
+                    aria-describedby={errors.endDate ? 'term-end-date-error' : undefined}
+                    className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   />
-                  {errors.endDate && <p className="text-red-500 text-xs mt-1">{errors.endDate.message}</p>}
+                  {errors.endDate && <p id="term-end-date-error" className="mt-1 text-xs font-medium text-red-700">{errors.endDate.message}</p>}
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 mt-6 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : 'Save Term'}
               </button>
@@ -172,7 +200,16 @@ export default function TermsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
-                  {terms.length === 0 ? (
+                  {isLoading ? (
+                    <StatusRow colSpan={4} message="Loading terms..." />
+                  ) : loadError ? (
+                    <StatusRow
+                      colSpan={4}
+                      tone="error"
+                      message={`Could not load the terms. ${loadError}`}
+                      onRetry={retryLoad}
+                    />
+                  ) : terms.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="p-8 text-center text-gray-500">
                         No terms found. Create a semester to begin scheduling.

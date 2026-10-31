@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { StatusBlock } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
+import { countClassesForCohort } from '@/lib/timetable';
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // NEW: State for our Cohort Filter
   const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
@@ -43,6 +47,7 @@ export default function Home() {
       // Sort by start time
       scheduledClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
       setSchedule(scheduledClasses);
+      setLoadError(null);
 
       // NEW: Extract all unique cohorts so we can populate the dropdown automatically
       const uniqueCohorts = Array.from(new Set(scheduledClasses.map(c => c.cohortName))).sort();
@@ -50,6 +55,7 @@ export default function Home() {
       
     } catch (error) {
       console.error('Failed to fetch schedule:', error);
+      setLoadError(getErrorMessage(error));
     } finally {
       setIsLoadingSchedule(false);
     }
@@ -67,12 +73,9 @@ export default function Home() {
       const res = await api.generateSchedule();
       setMessage({ text: res.message || '✨ Schedule successfully generated!', type: 'success' });
       await fetchSchedule();
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      setMessage({ 
-        text: error.response?.data?.message || 'Failed to generate schedule. Check if Python backend is running!', 
-        type: 'error' 
-      });
+      setMessage({ text: `Could not generate the timetable. ${getErrorMessage(error)}`, type: 'error' });
     } finally {
       setIsGenerating(false);
     }
@@ -87,20 +90,27 @@ export default function Home() {
     });
   };
 
+  // Number of class blocks shown with the current cohort filter, on all days.
+  const visibleCount = countClassesForCohort(schedule, selectedCohort);
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans p-8">
+    <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER & CONTROLS */}
-        <header className="mb-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        <header className="mb-8 flex flex-col justify-between gap-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8 lg:flex-row lg:items-center">
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
+            <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
               University Command Center
             </h1>
             <p className="text-gray-500">
-              {schedule.length > 0 
-                ? `Viewing ${selectedCohort === 'All' ? schedule.length : getClassesForDay(DAYS[0]).length /* approximation */} scheduled class blocks.`
-                : 'No classes scheduled yet. Click generate to start the AI engine.'}
+              {isLoadingSchedule
+                ? 'Loading the timetable...'
+                : loadError
+                  ? 'The timetable could not be loaded.'
+                  : schedule.length > 0
+                    ? `Viewing ${visibleCount} scheduled class blocks.`
+                    : 'No classes scheduled yet. Click generate to start the AI engine.'}
             </p>
           </div>
 
@@ -152,8 +162,16 @@ export default function Home() {
 
         {/* THE SCHEDULE GRID */}
         {isLoadingSchedule ? (
-          <div className="flex justify-center items-center h-64 text-gray-400 font-medium">
-            Loading master schedule...
+          <div className="flex h-64 items-center justify-center rounded-2xl border border-gray-100 bg-white">
+            <StatusBlock message="Loading the timetable..." />
+          </div>
+        ) : loadError ? (
+          <div className="flex h-64 items-center justify-center rounded-2xl border border-red-200 bg-white">
+            <StatusBlock
+              tone="error"
+              message={`Could not load the timetable. ${loadError}`}
+              onRetry={fetchSchedule}
+            />
           </div>
         ) : schedule.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-500">
@@ -171,7 +189,7 @@ export default function Home() {
                 
                 <div className="flex flex-col gap-3 h-[700px] overflow-y-auto pr-2 custom-scrollbar">
                   {getClassesForDay(day).length === 0 ? (
-                    <div className="text-center text-gray-400 text-sm py-4 bg-gray-100 rounded-lg border border-dashed border-gray-200">
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-100 py-4 text-center text-sm text-gray-600">
                       No classes
                     </div>
                   ) : (

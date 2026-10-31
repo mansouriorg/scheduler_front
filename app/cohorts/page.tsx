@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Notice, type NoticeMessage } from '@/components/notice';
+import { StatusRow } from '@/components/status-message';
+import { getErrorMessage } from '@/lib/api-error';
 import { api } from '@/lib/api'; 
 
 // 1. Zod Validation Schema (Cleaned up for strict TypeScript matching)
@@ -20,6 +23,9 @@ export default function CohortsPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeMessage | null>(null);
 
   const {
     register,
@@ -39,34 +45,46 @@ export default function CohortsPage() {
       try {
         const data = await api.getCohorts(); 
         setCohorts(data);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch cohorts. Backend might be offline.', error);
+        setLoadError(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchCohorts();
   }, [refreshTrigger]);
 
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   // 3. Handle Form Submission using the API client
   const onSubmit = async (data: CohortFormValues) => {
     setIsSubmitting(true);
+    setNotice(null);
     try {
       await api.createCohort(data); 
 
-      alert('Cohort added successfully!');
+      setNotice({ type: 'success', text: 'Cohort saved.' });
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error(error);
-      alert('Network error. Is your NestJS backend running?');
+      setNotice({ type: 'error', text: `Could not save the cohort. ${getErrorMessage(error)}` });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Student Cohort Management</h1>
+        <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Student Cohort Management</h1>
+        <Notice message={notice} onDismiss={setNotice} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -78,48 +96,57 @@ export default function CohortsPage() {
               
               {/* Cohort Name Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Group / Cohort Name</label>
+                <label htmlFor="cohort-name" className="block text-sm font-medium text-gray-700 mb-1">Group / Cohort Name</label>
                 <input
                   {...register('name')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="cohort-name"
+                  aria-invalid={errors.name ? true : undefined}
+                  aria-describedby={errors.name ? 'cohort-name-hint cohort-name-error' : 'cohort-name-hint'}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. Software Engineering - Year 1 - Grp A"
                 />
-                <p className="text-xs text-gray-500 mt-1">Be as specific as possible (Major - Year - Section).</p>
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+                <p id="cohort-name-hint" className="text-xs text-gray-500 mt-1">Be as specific as possible (Major - Year - Section).</p>
+                {errors.name && <p id="cohort-name-error" className="mt-1 text-xs font-medium text-red-700">{errors.name.message}</p>}
               </div>
 
               {/* Headcount Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Headcount</label>
+                <label htmlFor="cohort-headcount" className="block text-sm font-medium text-gray-700 mb-1">Total Headcount</label>
                 <input
                   type="number"
                   // Added valueAsNumber: true to pass a pure number to Zod
                   {...register('headcount', { valueAsNumber: true })}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500"
+                  id="cohort-headcount"
+                  aria-invalid={errors.headcount ? true : undefined}
+                  aria-describedby={errors.headcount ? 'cohort-headcount-hint cohort-headcount-error' : 'cohort-headcount-hint'}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                   placeholder="e.g. 45"
                 />
-                <p className="text-xs text-gray-500 mt-1">Crucial for matching with Room Capacity.</p>
-                {errors.headcount && <p className="text-red-500 text-xs mt-1">{errors.headcount.message}</p>}
+                <p id="cohort-headcount-hint" className="text-xs text-gray-500 mt-1">Crucial for matching with Room Capacity.</p>
+                {errors.headcount && <p id="cohort-headcount-error" className="mt-1 text-xs font-medium text-red-700">{errors.headcount.message}</p>}
               </div>
 
               {/* Current Semester Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Active Semester</label>
+                <label htmlFor="cohort-current-semester" className="block text-sm font-medium text-gray-700 mb-1">Active Semester</label>
                 <select
                   {...register('currentSemester')}
-                  className="w-full rounded-lg border-gray-300 shadow-sm p-2.5 border focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  id="cohort-current-semester"
+                  aria-invalid={errors.currentSemester ? true : undefined}
+                  aria-describedby={errors.currentSemester ? 'cohort-current-semester-error' : undefined}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="SEMESTER_1">Semester 1 (Fall)</option>
                   <option value="SEMESTER_2">Semester 2 (Spring)</option>
                   <option value="SUMMER">Summer Term</option>
                 </select>
-                {errors.currentSemester && <p className="text-red-500 text-xs mt-1">{errors.currentSemester.message}</p>}
+                {errors.currentSemester && <p id="cohort-current-semester-error" className="mt-1 text-xs font-medium text-red-700">{errors.currentSemester.message}</p>}
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 mt-6 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : 'Save Cohort'}
               </button>
@@ -145,7 +172,16 @@ export default function CohortsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
-                  {cohorts.length === 0 ? (
+                  {isLoading ? (
+                    <StatusRow colSpan={3} message="Loading cohorts..." />
+                  ) : loadError ? (
+                    <StatusRow
+                      colSpan={3}
+                      tone="error"
+                      message={`Could not load the cohorts. ${loadError}`}
+                      onRetry={retryLoad}
+                    />
+                  ) : cohorts.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="p-8 text-center text-gray-500">
                         No cohorts registered. Add a student group to get started.
