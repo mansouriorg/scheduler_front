@@ -58,6 +58,8 @@ export const api = {
   // --- COURSE OFFERINGS ---
   getOfferings: () => apiClient.get('/course-offerings').then(res => res.data),
   createOffering: (data: any) => apiClient.post('/course-offerings', data).then(res => res.data),
+  updateOffering: (id: string, data: unknown) => apiClient.patch(`/course-offerings/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteOffering: (id: string) => apiClient.delete(`/course-offerings/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- SCHEDULER (THE BRAIN BRIDGE) ---
   generateSchedule: () => apiClient.post('/scheduler/generate').then(res => res.data),

@@ -46,7 +46,7 @@ Open http://localhost:3000.
 | `/courses`    | `app/courses/page.tsx`    | add, edit, delete and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add, edit, delete and list student groups and their headcount |
 | `/terms`      | `app/terms/page.tsx`      | add, edit, delete and list academic terms and their dates |
-| `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term    |
+| `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term; move or delete an offering |
 
 - The API calls are in `lib/api.ts`.
 - The sidebar and the phone menu are in `components/app-sidebar.tsx`; the page frame
@@ -70,6 +70,10 @@ Open http://localhost:3000.
   TP) applies to course offerings created afterwards; existing offerings keep their
   classes. brain_server refuses to delete a course that has course offerings, and the
   page shows its reason.
+- Course offerings can be moved to another term or cohort and deleted from their list;
+  their course cannot change. A move takes the offering's classes out of the timetable,
+  and a delete removes them with it (the "Delete?" window says how many). brain_server
+  refuses to delete an offering with enrolled students, and the page shows its reason.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).
