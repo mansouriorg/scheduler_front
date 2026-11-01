@@ -81,6 +81,14 @@ Open http://localhost:3000.
   (the page shows why) a teacher who would teach too many hours a week, or who is busy or
   away when a class takes place. `lib/class-teachers.ts` names the classes and finds the
   changes (`class-teachers.test.mjs`; `tests/offering-teachers.test.mjs` checks the button).
+- In the Teachers form, each teacher in a list shows the hours a week they would teach in
+  the offering's term with that class ("Dr. Amal Ben Salah: 10.5 of 12 hrs (Computer
+  Science)"), counted as brain_server counts them: their classes of every term whose dates
+  overlap it, and the choices in the form. Under each list, a line repeats it for the
+  teacher chosen (the list may be too narrow to show it), and above Save the form says
+  which teacher who gets a class would go over their maximum, so that saving would be
+  refused. `teacherMinutes` in `lib/class-teachers.ts` counts; `lib/teacher-hours.ts`
+  writes the texts.
 - "Times off" on the Teachers page sets the times each week when a teacher cannot teach
   (a day, from, to; every half hour from 08:00 to 18:30). They are saved all together;
   Generate keeps the teacher's classes out of them, and brain_server refuses (the page

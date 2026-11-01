@@ -11,7 +11,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
 import { GraduationCap, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; // <-- Import your centralized API client
-import { classLabels, classTime, teacherChanges, teacherChoices, type OfferingClass } from '@/lib/class-teachers';
+import { classLabels, classTime, teacherChanges, teacherChoices, teacherMinutes, type OfferingClass } from '@/lib/class-teachers';
+import { overMaximumText, teacherOptionText, withClassLine } from '@/lib/teacher-hours';
 
 // 1. Zod Validation Schema
 const offeringSchema = z.object({
@@ -28,7 +29,7 @@ type Offering = {
   termId: string;
   courseId: string;
   cohortId: string;
-  term: { name: string };
+  term: { name: string; startDate: string; endDate: string };
   course: { code: string; title: string };
   cohort: { name: string; headcount: number };
   classes: OfferingClass[];
@@ -39,8 +40,9 @@ type TermOption = { id: string; name: string };
 type CourseOption = { id: string; code: string; title: string };
 type CohortOption = { id: string; name: string; headcount: number };
 
-// A teacher in the lists of the Teachers form.
-type Teacher = { id: string; name: string; department: string };
+// A teacher in the lists of the Teachers form, with the most hours they may teach
+// a week.
+type Teacher = { id: string; name: string; department: string; maxHoursPerWeek: number };
 
 // "DEV-101 for SE - Year 1 in Fall 2026": how buttons and messages name an offering.
 const offeringName = (offering: Offering) =>
@@ -263,6 +265,27 @@ export default function CourseOfferingsPage() {
   // "LECTURE", "TD 1", "TD 2": the names of the classes in the Teachers form.
   const teachingLabels = teaching ? classLabels(teaching.classes) : [];
 
+  // For each class in the Teachers form: the minutes a week a teacher would teach
+  // in the weeks of the offering's term with that class (their other classes
+  // included, and the other choices in the form), shown in its list, and the line
+  // under the list for the teacher chosen (null: none chosen).
+  const classHours = (teaching?.classes ?? []).map((cls) => {
+    const without = teaching ? teacherMinutes(offerings, teaching, choices, cls.id) : new Map<string, number>();
+    const minutesWith = (teacherId: string) => (without.get(teacherId) ?? 0) + cls.durationMinutes;
+    const chosen = teachers.find((teacher) => teacher.id === choices[cls.id]);
+    return { minutesWith, chosen: chosen ? withClassLine(minutesWith(chosen.id), chosen.maxHoursPerWeek) : null };
+  });
+
+  // The teachers who get a class in the Teachers form and would then teach more
+  // than their maximum a week in the offering's term, one sentence each:
+  // brain_server refuses to save that.
+  const minutesNow = teaching ? teacherMinutes(offerings, teaching, choices) : new Map<string, number>();
+  const gaining = teaching ? teacherChanges(teaching.classes, choices).map((change) => change.professorId) : [];
+  const overMaximum = teachers
+    .filter((teacher) => gaining.includes(teacher.id))
+    .map((teacher) => (teaching ? overMaximumText(teacher, minutesNow.get(teacher.id) ?? 0, teaching.term.name) : null))
+    .filter((text): text is string => text !== null);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -296,6 +319,10 @@ export default function CourseOfferingsPage() {
                     Each class can have its own teacher. A class that is already in the timetable keeps its day and
                     time, so its teacher must be free then.
                   </p>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Next to each teacher: the hours a week they would teach in {teaching.term.name} with that class
+                    (their other classes in those weeks included), and their maximum.
+                  </p>
                 </div>
                 {teachers.length === 0 && (
                   <p className="text-sm text-gray-700">
@@ -315,7 +342,11 @@ export default function CourseOfferingsPage() {
                     </p>
                     <select
                       id={`class-teacher-${cls.id}`}
-                      aria-describedby={`class-teacher-${cls.id}-when`}
+                      aria-describedby={
+                        classHours[index].chosen
+                          ? `class-teacher-${cls.id}-when class-teacher-${cls.id}-hours`
+                          : `class-teacher-${cls.id}-when`
+                      }
                       value={choices[cls.id] ?? ''}
                       onChange={(event) => {
                         const value = event.target.value;
@@ -326,12 +357,32 @@ export default function CourseOfferingsPage() {
                       <option value="">No teacher yet</option>
                       {teachers.map((teacher) => (
                         <option key={teacher.id} value={teacher.id}>
-                          {teacher.name} ({teacher.department})
+                          {teacherOptionText(teacher, classHours[index].minutesWith(teacher.id))}
                         </option>
                       ))}
                     </select>
+                    {classHours[index].chosen && (
+                      <p
+                        id={`class-teacher-${cls.id}-hours`}
+                        className={`mt-1 text-xs ${classHours[index].chosen.over ? 'font-medium text-red-700' : 'text-gray-600'}`}
+                      >
+                        {classHours[index].chosen.text}
+                      </p>
+                    )}
                   </div>
                 ))}
+                <div aria-live="polite">
+                  {overMaximum.length > 0 && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      <ul className="space-y-1 font-medium">
+                        {overMaximum.map((text) => (
+                          <li key={text}>{text}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-2">Saving would be refused: choose another teacher for some of those classes.</p>
+                    </div>
+                  )}
+                </div>
                 <div className="mt-6 space-y-3">
                   <button
                     type="submit"

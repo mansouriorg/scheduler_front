@@ -18,15 +18,20 @@ export function hoursOf(minutes: number): string {
   return String(Number((minutes / 60).toFixed(2)));
 }
 
+// "9 of 12 hrs" ("1 of 1 hr"): the hours a week of a teacher, and their maximum.
+export function hoursOfMaximum(minutes: number, maxHoursPerWeek: number): string {
+  return `${hoursOf(minutes)} of ${maxHoursPerWeek} ${maxHoursPerWeek === 1 ? 'hr' : 'hrs'}`;
+}
+
 // "Fall 2026: 9 of 12 hrs", one line per term, in the order brain_server sends
 // them (date order).
 export function weeklyHoursLines(weeks: WeeklyHours[], maxHoursPerWeek: number): HoursLine[] {
-  const unit = maxHoursPerWeek === 1 ? 'hr' : 'hrs';
-  return weeks.map((week) => {
-    const over = week.minutesPerWeek > maxHoursPerWeek * 60;
-    const hours = `${hoursOf(week.minutesPerWeek)} of ${maxHoursPerWeek} ${unit}`;
-    return { key: week.termId, term: week.termName, hours, over };
-  });
+  return weeks.map((week) => ({
+    key: week.termId,
+    term: week.termName,
+    hours: hoursOfMaximum(week.minutesPerWeek, maxHoursPerWeek),
+    over: week.minutesPerWeek > maxHoursPerWeek * 60,
+  }));
 }
 
 // Under the maximum in the form, while a teacher is changed: the lowest maximum
@@ -38,4 +43,37 @@ export function maximumHint(name: string, weeks: WeeklyHours[] | undefined): str
   const hours = hoursOf(busiest.minutesPerWeek);
   const unit = hours === '1' ? 'hour' : 'hours';
   return `${name} already teaches ${hours} ${unit} a week in ${busiest.termName}, so the maximum cannot be lower than ${hours}.`;
+}
+
+// A teacher as the lists of the Course Offerings page show them.
+type ListedTeacher = { name: string; department: string; maxHoursPerWeek: number };
+
+// "1 hour", "10.5 hours".
+const hoursWord = (hours: string) => (hours === '1' ? '1 hour' : `${hours} hours`);
+
+// A teacher in the list of a class on the Course Offerings page, with the hours a
+// week they would teach with that class: "Dr. Amal Ben Salah: 10.5 of 12 hrs
+// (Computer Science)", and ", over the maximum" after the hours when they would
+// teach more than that. The hours come before the department, so that a narrow
+// list cuts the department first.
+export function teacherOptionText(teacher: ListedTeacher, minutes: number): string {
+  const over = minutes > teacher.maxHoursPerWeek * 60 ? ', over the maximum' : '';
+  return `${teacher.name}: ${hoursOfMaximum(minutes, teacher.maxHoursPerWeek)}${over} (${teacher.department})`;
+}
+
+// Under the list of a class, for the teacher chosen: "With this class: 9 of 12 hrs
+// a week", and ", over the maximum" (over: true) when they would teach more than
+// that. The list itself may be too narrow to show the hours of its choice.
+export function withClassLine(minutes: number, maxHoursPerWeek: number): { text: string; over: boolean } {
+  const over = minutes > maxHoursPerWeek * 60;
+  const text = `With this class: ${hoursOfMaximum(minutes, maxHoursPerWeek)} a week${over ? ', over the maximum' : ''}`;
+  return { text, over };
+}
+
+// Above Save in the Teachers form, for a teacher who gets a class and would then
+// teach more than their maximum a week in the term: brain_server refuses to save
+// that. null when they would not.
+export function overMaximumText(teacher: ListedTeacher, minutes: number, termName: string): string | null {
+  if (minutes <= teacher.maxHoursPerWeek * 60) return null;
+  return `${teacher.name} would teach ${hoursWord(hoursOf(minutes))} a week in ${termName}, more than their maximum of ${hoursWord(String(teacher.maxHoursPerWeek))}.`;
 }

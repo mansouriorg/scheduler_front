@@ -20,3 +20,10 @@ test('offerings: the Teachers form saves only the changed classes, in one reques
   assert.equal(source.split('api.assignTeachers(').length - 1, 1, 'teachers are saved from more than one place');
   assert.match(source, /teacherChanges\(teaching\.classes, choices\)/);
 });
+
+test('offerings: each teacher in a list shows the hours with that class; the warnings are read when they change', () => {
+  assert.match(source, /teacherOptionText\(teacher, classHours\[index\]\.minutesWith\(teacher\.id\)\)/);
+  assert.match(source, /`class-teacher-\$\{cls\.id\}-when class-teacher-\$\{cls\.id\}-hours`/);
+  assert.match(source, /id=\{`class-teacher-\$\{cls\.id\}-hours`\}/);
+  assert.match(source, /<div aria-live="polite">\s*\{overMaximum\.length > 0 && \(/);
+});
