@@ -18,12 +18,15 @@ type SearchBarProps = {
   count: string | null;
   // Shown next to the title, for example how many cohorts there are (optional).
   badge?: ReactNode;
+  // How the rows are sorted ("Sorted by Name, A to Z", see sortText in
+  // lib/table-sort.ts), said after the count; null in the order of brain_server.
+  sorted?: string | null;
 };
 
 // The bar above a table: its title, a search box that keeps the rows that have
 // what is typed (see lib/table-search.ts), and how many rows the search shows,
 // which screen readers announce. Escape empties the box.
-export function TableSearchBar({ title, inputId, label, placeholder, value, onChange, count, badge }: SearchBarProps) {
+export function TableSearchBar({ title, inputId, label, placeholder, value, onChange, count, badge, sorted }: SearchBarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-gray-100 bg-gray-50/50 px-6 py-5">
       <div className="min-w-0">
@@ -32,7 +35,7 @@ export function TableSearchBar({ title, inputId, label, placeholder, value, onCh
           {badge}
         </div>
         <p id={`${inputId}-count`} role="status" className="text-sm text-gray-600">
-          {count ?? ''}
+          {[count, sorted].filter((part) => part).join('. ')}
         </p>
       </div>
       <div className="relative w-full sm:w-64">

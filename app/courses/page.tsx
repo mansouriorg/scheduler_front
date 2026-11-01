@@ -9,6 +9,8 @@ import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
 import { NoMatchRow, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
+import { SortHeader, SortSelect } from '@/components/table-sort';
+import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -30,6 +32,8 @@ export default function CoursesPage() {
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
   // What is typed in the search box above the list (see lib/table-search.ts).
   const [search, setSearch] = useState('');
+  // The column the table is sorted by, and which way (null: as brain_server sends it).
+  const [sort, setSort] = useState<Sort>(null);
   // The course shown in the form for changes (null: the form adds a new course),
   // and the course waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Course | null>(null);
@@ -155,13 +159,25 @@ export default function CoursesPage() {
     }
   };
 
+  // The columns the table can be sorted by (see lib/table-sort.ts).
+  const sortColumns: SortColumn<Course>[] = [
+    { key: 'code', label: 'Code', kind: 'text', value: (course) => course.code },
+    { key: 'title', label: 'Title', kind: 'text', value: (course) => course.title },
+    { key: 'hours', label: 'Hours', kind: 'number', value: (course) => course.totalHours },
+    { key: 'credits', label: 'Credits', kind: 'number', value: (course) => course.credits },
+  ];
+
   // The courses that have what is typed in the search box, in their code, title or kinds of
-  // class (Breakdown).
-  const shownCourses = filterBySearch(courses, search, (course) => [
-    course.code,
-    course.title,
-    ...course.componentsTemplate.map((comp) => comp.type),
-  ]);
+  // class (Breakdown), in the order chosen with the column headings.
+  const shownCourses = sortRows(
+    filterBySearch(courses, search, (course) => [
+      course.code,
+      course.title,
+      ...course.componentsTemplate.map((comp) => comp.type),
+    ]),
+    sortColumns,
+    sort,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -324,16 +340,18 @@ export default function CoursesPage() {
               value={search}
               onChange={setSearch}
               count={searchCount(shownCourses.length, courses.length, search, 'course', 'courses')}
+              sorted={sortText(sortColumns, sort)}
             />
             
             <div className="@container overflow-x-auto">
+              <SortSelect id="sort-courses" columns={sortColumns} sort={sort} onSort={setSort} className={cards.sort} />
               <table className={`w-full text-left border-collapse ${cards.table}`}>
                 <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                    <th className="p-4 font-medium">Code</th>
-                    <th className="p-4 font-medium">Title</th>
-                    <th className="p-4 font-medium">Hours</th>
-                    <th className="p-4 font-medium">Credits</th>
+                    <SortHeader columns={sortColumns} columnKey="code" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="title" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="hours" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="credits" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium">Breakdown</th>
                     <th className="sticky right-0 bg-gray-50 p-4 font-medium text-right shadow-[inset_1px_0_0_#f3f4f6]">Actions</th>
                   </tr>

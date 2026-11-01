@@ -9,6 +9,8 @@ import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
 import { NoMatchRow, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
+import { SortHeader, SortSelect } from '@/components/table-sort';
+import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Clock, Pencil, Trash2 } from 'lucide-react';
@@ -60,6 +62,8 @@ export default function TeachersPage() {
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
   // What is typed in the search box above the list (see lib/table-search.ts).
   const [search, setSearch] = useState('');
+  // The column the table is sorted by, and which way (null: as brain_server sends it).
+  const [sort, setSort] = useState<Sort>(null);
   // The teacher shown in the form for changes (null: the form adds a new teacher),
   // and the teacher waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Teacher | null>(null);
@@ -215,8 +219,20 @@ export default function TeachersPage() {
     }
   };
 
-  // The teachers that have what is typed in the search box, in their name or department.
-  const shownTeachers = filterBySearch(teachers, search, (teacher) => [teacher.name, teacher.department]);
+  // The columns the table can be sorted by (see lib/table-sort.ts).
+  const sortColumns: SortColumn<Teacher>[] = [
+    { key: 'name', label: 'Name', kind: 'text', value: (teacher) => teacher.name },
+    { key: 'department', label: 'Department', kind: 'text', value: (teacher) => teacher.department },
+    { key: 'maxHours', label: 'Max Hours', kind: 'number', value: (teacher) => teacher.maxHoursPerWeek },
+  ];
+
+  // The teachers that have what is typed in the search box, in their name or department,
+  // in the order chosen with the column headings.
+  const shownTeachers = sortRows(
+    filterBySearch(teachers, search, (teacher) => [teacher.name, teacher.department]),
+    sortColumns,
+    sort,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -442,15 +458,17 @@ export default function TeachersPage() {
               value={search}
               onChange={setSearch}
               count={searchCount(shownTeachers.length, teachers.length, search, 'teacher', 'teachers')}
+              sorted={sortText(sortColumns, sort)}
             />
             
             <div className="@container overflow-x-auto">
+              <SortSelect id="sort-teachers" columns={sortColumns} sort={sort} onSort={setSort} className={cards.sort} />
               <table className={`w-full text-left border-collapse ${cards.table}`}>
                 <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                    <th className="p-4 font-medium">Name</th>
-                    <th className="p-4 font-medium">Department</th>
-                    <th className="p-4 font-medium">Max Hours</th>
+                    <SortHeader columns={sortColumns} columnKey="name" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="department" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="maxHours" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium">Availability</th>
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>

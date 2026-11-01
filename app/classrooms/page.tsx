@@ -9,6 +9,8 @@ import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
 import { NoMatchRow, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
+import { SortHeader, SortSelect } from '@/components/table-sort';
+import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -54,6 +56,8 @@ export default function ClassroomsPage() {
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
   // What is typed in the search box above the list (see lib/table-search.ts).
   const [search, setSearch] = useState('');
+  // The column the table is sorted by, and which way (null: as brain_server sends it).
+  const [sort, setSort] = useState<Sort>(null);
   // The room shown in the form for changes (null: the form adds a new room),
   // and the room waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Room | null>(null);
@@ -166,14 +170,27 @@ export default function ClassroomsPage() {
     }
   };
 
+  // The columns the table can be sorted by (see lib/table-sort.ts).
+  const sortColumns: SortColumn<Room>[] = [
+    { key: 'name', label: 'Name', kind: 'text', value: (room) => room.name },
+    { key: 'type', label: 'Type', kind: 'text', value: (room) => room.roomType.replace('_', ' ') },
+    { key: 'capacity', label: 'Capacity', kind: 'number', value: (room) => room.capacity },
+    { key: 'location', label: 'Location', kind: 'text', value: (room) => findFloorLabel(floorOptions, room.floorId) },
+  ];
+
   // The rooms that have what is typed in the search box, in their name, type, building and
-  // floor, or equipment, as the table shows them.
-  const shownRooms = filterBySearch(rooms, search, (room) => [
-    room.name,
-    room.roomType.replace('_', ' '),
-    findFloorLabel(floorOptions, room.floorId),
-    ...room.equipment.map((eq) => eq.replace('_', ' ')),
-  ]);
+  // floor, or equipment, as the table shows them, in the order chosen with the column
+  // headings.
+  const shownRooms = sortRows(
+    filterBySearch(rooms, search, (room) => [
+      room.name,
+      room.roomType.replace('_', ' '),
+      findFloorLabel(floorOptions, room.floorId),
+      ...room.equipment.map((eq) => eq.replace('_', ' ')),
+    ]),
+    sortColumns,
+    sort,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -317,16 +334,18 @@ export default function ClassroomsPage() {
               value={search}
               onChange={setSearch}
               count={searchCount(shownRooms.length, rooms.length, search, 'room', 'rooms')}
+              sorted={sortText(sortColumns, sort)}
             />
             
             <div className="@container overflow-x-auto">
+              <SortSelect id="sort-rooms" columns={sortColumns} sort={sort} onSort={setSort} className={cards.sort} />
               <table className={`w-full text-left border-collapse ${cards.table}`}>
                 <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                    <th className="p-4 font-medium">Name</th>
-                    <th className="p-4 font-medium">Type</th>
-                    <th className="p-4 font-medium">Capacity</th>
-                    <th className="p-4 font-medium">Location</th>
+                    <SortHeader columns={sortColumns} columnKey="name" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="type" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="capacity" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="location" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium">Equipment</th>
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>

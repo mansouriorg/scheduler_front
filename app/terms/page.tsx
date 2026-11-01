@@ -9,6 +9,8 @@ import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
 import { NoMatchRow, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
+import { SortHeader, SortSelect } from '@/components/table-sort';
+import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -44,6 +46,8 @@ export default function TermsPage() {
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
   // What is typed in the search box above the list (see lib/table-search.ts).
   const [search, setSearch] = useState('');
+  // The column the table is sorted by, and which way (null: as brain_server sends it).
+  const [sort, setSort] = useState<Sort>(null);
   // The term shown in the form for changes (null: the form adds a new term),
   // and the term waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Term | null>(null);
@@ -166,14 +170,26 @@ export default function TermsPage() {
     });
   };
 
+  // The columns the table can be sorted by (see lib/table-sort.ts).
+  const sortColumns: SortColumn<Term>[] = [
+    { key: 'name', label: 'Term Name', kind: 'text', value: (term) => term.name },
+    { key: 'type', label: 'Type', kind: 'text', value: (term) => term.type.replace('_', ' ') },
+    { key: 'start', label: 'Start Date', kind: 'date', value: (term) => term.startDate },
+    { key: 'end', label: 'End Date', kind: 'date', value: (term) => term.endDate },
+  ];
+
   // The terms that have what is typed in the search box, in their name, type or dates,
-  // as the table shows them.
-  const shownTerms = filterBySearch(terms, search, (term) => [
-    term.name,
-    term.type.replace('_', ' '),
-    formatDate(term.startDate),
-    formatDate(term.endDate),
-  ]);
+  // as the table shows them, in the order chosen with the column headings.
+  const shownTerms = sortRows(
+    filterBySearch(terms, search, (term) => [
+      term.name,
+      term.type.replace('_', ' '),
+      formatDate(term.startDate),
+      formatDate(term.endDate),
+    ]),
+    sortColumns,
+    sort,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -281,16 +297,18 @@ export default function TermsPage() {
               value={search}
               onChange={setSearch}
               count={searchCount(shownTerms.length, terms.length, search, 'term', 'terms')}
+              sorted={sortText(sortColumns, sort)}
             />
             
             <div className="@container overflow-x-auto">
+              <SortSelect id="sort-terms" columns={sortColumns} sort={sort} onSort={setSort} className={cards.sort} />
               <table className={`w-full text-left border-collapse ${cards.table}`}>
                 <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                    <th className="p-4 font-medium">Term Name</th>
-                    <th className="p-4 font-medium">Type</th>
-                    <th className="p-4 font-medium">Start Date</th>
-                    <th className="p-4 font-medium">End Date</th>
+                    <SortHeader columns={sortColumns} columnKey="name" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="type" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="start" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="end" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>

@@ -13,7 +13,11 @@ for (const page of PAGES_WITH_TABLES) {
   test(`${page}: the table becomes cards where its box is narrow`, () => {
     assert.match(source, /import \{ TABLE_CARDS \} from '@\/lib\/table-cards';/);
     assert.match(source, /^const cards = TABLE_CARDS\['(xl|2xl|3xl)'\];$/m);
-    assert.match(source, /<div className="@container overflow-x-auto">\s*<table className=\{`[^`]*\$\{cards\.table\}`\}>/);
+    // The "Sort by" list above the cards (lib/table-sort.ts) may come before the table.
+    assert.match(
+      source,
+      /<div className="@container overflow-x-auto">\s*(<SortSelect [^\n]*className=\{cards\.sort\} \/>\s*)?<table className=\{`[^`]*\$\{cards\.table\}`\}>/,
+    );
     assert.match(source, /<thead className=\{cards\.head\}>/);
     assert.match(source, /<tbody className=\{`[^`]*\$\{cards\.body\}`\}>/);
     assert.equal(source.match(/\$\{cards\.row\}/g)?.length, 1, 'one row of data with cards.row');
@@ -23,7 +27,11 @@ for (const page of PAGES_WITH_TABLES) {
   });
 
   test(`${page}: every value in a card has its column name`, () => {
-    const headers = [...source.matchAll(/<th\b[^>]*>([^<]+)<\/th>/g)].map((match) => match[1].trim());
+    // A heading is a <th>, or a SortHeader whose label is in the sortColumns of the page.
+    const sortLabels = Object.fromEntries([...source.matchAll(/\{ key: '(\w+)', label: '([^']+)'/g)].map((match) => [match[1], match[2]]));
+    const headers = [...source.matchAll(/<th\b[^>]*>([^<]+)<\/th>|<SortHeader [^>]*columnKey="(\w+)"/g)].map((match) =>
+      match[1] === undefined ? sortLabels[match[2]] : match[1].trim(),
+    );
     const labels = [...source.matchAll(/<span className=\{cards\.label\}>([^<]+)<\/span>/g)].map((match) => match[1]);
     // The first column is the title of the card and the last one holds the buttons.
     assert.deepEqual(labels, headers.slice(1, -1));

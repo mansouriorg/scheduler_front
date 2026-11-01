@@ -134,6 +134,16 @@ Open http://localhost:3000.
   teachers"); screen readers read it out. Escape or "Clear search" empties the box. The
   rules are in `lib/table-search.ts` (`table-search.test.mjs`; `tests/table-search.test.mjs`
   checks the pages).
+- The tables (Classrooms, Teachers, Cohorts, Courses and Academic Terms) can be sorted: a
+  click on a column heading with arrows (or Enter or Space on it) sorts the rows by that
+  column, a second one reverses the order. Text goes A to Z ("Lab 2" before "Lab 10",
+  capitals and accents aside), numbers lowest first, dates earliest first; empty values
+  come last. Where a table is shown as cards, a "Sort by" list above the cards does the
+  same. The line under the title says the order ("Sorted by Capacity, highest first"), and
+  screen readers hear it there and on the heading (aria-sort). After a reload the rows are
+  in the order brain_server sends them again. The rules are in `lib/table-sort.ts`
+  (`table-sort.test.mjs`), the heading and the list in `components/table-sort.tsx`, and
+  `tests/table-sort.test.mjs` checks the pages.
 - After Generate, the home page shows a short summary ("12 classes were placed in the
   timetable of Fall 2026.") and, as a list under it, the notes from brain_server: the
   classes on Saturday, before their lecture, or outside the time their teacher prefers

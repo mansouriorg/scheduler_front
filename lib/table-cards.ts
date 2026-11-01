@@ -18,6 +18,7 @@ export type TableCards = {
   label: string; // the column name in front of a value in a card
   actions: string; // the last <td>: the buttons
   buttons: string; // the box of the buttons in it
+  sort: string; // the "Sort by" list above the cards: hidden where the table is shown
 };
 
 export const TABLE_CARDS = {
@@ -31,6 +32,7 @@ export const TABLE_CARDS = {
     label: 'text-xs font-medium uppercase tracking-wider text-gray-600 @xl:hidden',
     actions: 'block pt-2 @xl:table-cell @xl:p-4',
     buttons: '-ml-2 flex justify-start gap-1 @xl:ml-0 @xl:justify-end',
+    sort: 'flex items-center gap-3 border-b border-gray-100 px-4 py-3 @xl:hidden',
   },
   '2xl': {
     table: 'block @2xl:table',
@@ -42,6 +44,7 @@ export const TABLE_CARDS = {
     label: 'text-xs font-medium uppercase tracking-wider text-gray-600 @2xl:hidden',
     actions: 'block pt-2 @2xl:table-cell @2xl:p-4',
     buttons: '-ml-2 flex justify-start gap-1 @2xl:ml-0 @2xl:justify-end',
+    sort: 'flex items-center gap-3 border-b border-gray-100 px-4 py-3 @2xl:hidden',
   },
   '3xl': {
     table: 'block @3xl:table',
@@ -53,5 +56,6 @@ export const TABLE_CARDS = {
     label: 'text-xs font-medium uppercase tracking-wider text-gray-600 @3xl:hidden',
     actions: 'block pt-2 @3xl:table-cell @3xl:p-4',
     buttons: '-ml-2 flex justify-start gap-1 @3xl:ml-0 @3xl:justify-end',
+    sort: 'flex items-center gap-3 border-b border-gray-100 px-4 py-3 @3xl:hidden',
   },
 } satisfies Record<string, TableCards>;

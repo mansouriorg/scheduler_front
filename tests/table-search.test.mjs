@@ -24,7 +24,8 @@ for (const [page, rows, inputId, one, noMatch] of PAGES) {
   const shown = `shown${rows[0].toUpperCase()}${rows.slice(1)}`;
 
   test(`${page}: the table shows only the rows found by the search`, () => {
-    assert.match(source, new RegExp(`const ${shown} = filterBySearch\\(${rows}, search, `), `${shown} is not filtered with filterBySearch`);
+    // The rows found may then be sorted (sortRows, lib/table-sort.ts).
+    assert.match(source, new RegExp(`const ${shown} = (sortRows\\(\\s*)?filterBySearch\\(${rows}, search, `), `${shown} is not filtered with filterBySearch`);
     assert.match(source, new RegExp(`\\b${shown}\\.map\\(\\(${one}\\) =>`), `the table does not show ${shown}`);
     assert.doesNotMatch(source, new RegExp(`\\b${rows}\\.map\\(\\(${one}\\) =>`), `the table still shows every ${one}`);
   });
