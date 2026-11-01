@@ -65,6 +65,7 @@ export const api = {
     apiClient.patch(`/course-offerings/${encodeURIComponent(id)}/teachers`, { classes }).then(res => res.data),
 
   // --- SCHEDULER (THE BRAIN BRIDGE) ---
-  generateSchedule: () => apiClient.post('/scheduler/generate').then(res => res.data),
-  clearTimetable: () => apiClient.delete('/scheduler/timetable').then(res => res.data),
+  // Both work on one term: generate places its classes, clear takes them out.
+  generateSchedule: (termId: string) => apiClient.post('/scheduler/generate', { termId }).then(res => res.data),
+  clearTimetable: (termId: string) => apiClient.delete('/scheduler/timetable', { params: { termId } }).then(res => res.data),
 };

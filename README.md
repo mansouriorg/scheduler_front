@@ -39,7 +39,7 @@ Open http://localhost:3000.
 
 | Path          | File                      | What you do there                                   |
 |---------------|---------------------------|-----------------------------------------------------|
-| `/`           | `app/page.tsx`            | see the timetable (each class with its room and teacher), filter by cohort, generate it or clear it |
+| `/`           | `app/page.tsx`            | choose a term; see its timetable (each class with its room and teacher), filter by cohort, generate it or clear it |
 | `/locations`  | `app/locations/page.tsx`  | add, edit, move, delete and list campuses, buildings and floors |
 | `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
@@ -83,9 +83,13 @@ Open http://localhost:3000.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page and names the room of
   each class with its building and floor, and its teacher (tested in `timetable.test.mjs`).
-- "Clear timetable" on the home page takes the room, day and time off every class after
-  asking first; Generate then places them again. `tests/clear-timetable.test.mjs` checks
-  that the button only opens the confirmation window.
+  It also names the terms and picks the one the home page shows first: the term going on
+  today, else the next one, else the latest one.
+- The home page works on one term at a time: it shows the timetable of the chosen term,
+  Generate places only that term's classes, and "Clear timetable" takes the room, day and
+  time off that term's classes after asking first (other terms stay); Generate then places
+  them again. `tests/clear-timetable.test.mjs` checks that the button only opens the
+  confirmation window, and that Generate and Clear send the chosen term.
 - `lib/floor-options.ts` names the floors ("Building (CODE) - Level X") for the room form and table.
 - Every page shows a loading state, a load error with "Try again", and a message after each save.
 

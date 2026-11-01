@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
-import { countClassesForCohort, roomLabel, teacherLabel } from '@/lib/timetable';
+import {
+  countClassesForCohort,
+  defaultTermId,
+  localDay,
+  roomLabel,
+  teacherLabel,
+  termLabel,
+  type TermChoice,
+} from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function Home() {
@@ -17,8 +25,9 @@ export default function Home() {
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   
-  // NEW: State for our Cohort Filter
-  const [availableCohorts, setAvailableCohorts] = useState<string[]>([]);
+  // The term whose timetable is shown, generated and cleared, and the cohort filter.
+  const [terms, setTerms] = useState<TermChoice[]>([]);
+  const [selectedTermId, setSelectedTermId] = useState('');
   const [selectedCohort, setSelectedCohort] = useState<string>('All');
 
   const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -26,8 +35,12 @@ export default function Home() {
   const fetchSchedule = async () => {
     setIsLoadingSchedule(true);
     try {
-      // The offerings with their classes, and the teachers to name them.
-      const [offerings, teachers] = await Promise.all([api.getOfferings(), api.getTeachers()]);
+      // The offerings with their classes, the teachers to name them, and the terms.
+      const [offerings, teachers, termList] = await Promise.all([
+        api.getOfferings(),
+        api.getTeachers(),
+        api.getTerms(),
+      ]);
       
       const scheduledClasses: any[] = [];
       
@@ -36,6 +49,7 @@ export default function Home() {
           if (cls.startTime && cls.dayOfWeek) {
             scheduledClasses.push({
               id: cls.id,
+              termId: offering.termId,
               courseCode: offering.course.code,
               courseTitle: offering.course.title,
               cohortName: offering.cohort.name, // We use this for filtering!
@@ -55,9 +69,12 @@ export default function Home() {
       setSchedule(scheduledClasses);
       setLoadError(null);
 
-      // NEW: Extract all unique cohorts so we can populate the dropdown automatically
-      const uniqueCohorts = Array.from(new Set(scheduledClasses.map(c => c.cohortName))).sort();
-      setAvailableCohorts(uniqueCohorts as string[]);
+      // Keep the chosen term while it exists; otherwise start with the term
+      // going on today, the next one, or the latest one.
+      setTerms(termList);
+      setSelectedTermId((current) =>
+        termList.some((term: TermChoice) => term.id === current) ? current : defaultTermId(termList, localDay(new Date())),
+      );
       
     } catch (error) {
       console.error('Failed to fetch schedule:', error);
@@ -76,7 +93,7 @@ export default function Home() {
     setMessage({ text: '🧠 Python Brain is crunching millions of possibilities...', type: 'info' });
     
     try {
-      const res = await api.generateSchedule();
+      const res = await api.generateSchedule(selectedTermId);
       setMessage({ text: res.message || '✨ Schedule successfully generated!', type: 'success' });
       await fetchSchedule();
     } catch (error) {
@@ -92,7 +109,7 @@ export default function Home() {
   const handleClear = async () => {
     setIsClearing(true);
     try {
-      const res = await api.clearTimetable();
+      const res = await api.clearTimetable(selectedTermId);
       setMessage({ text: res.message, type: 'success' });
       setSelectedCohort('All');
       await fetchSchedule();
@@ -105,9 +122,22 @@ export default function Home() {
     }
   };
 
+  // Another term: its own timetable, all its cohorts.
+  const chooseTerm = (termId: string) => {
+    setSelectedTermId(termId);
+    setSelectedCohort('All');
+    setMessage(null);
+  };
+
+  // The classes of the chosen term: the page shows, counts and clears only these.
+  const termSchedule = schedule.filter((cls) => cls.termId === selectedTermId);
+  const termName = terms.find((term) => term.id === selectedTermId)?.name ?? 'this term';
+  // The cohorts that have classes in that timetable, for the cohort filter.
+  const availableCohorts: string[] = Array.from(new Set(termSchedule.map((cls) => cls.cohortName))).sort();
+
   // UPDATED: Now filters by the selected cohort!
   const getClassesForDay = (day: string) => {
-    return schedule.filter((cls) => {
+    return termSchedule.filter((cls) => {
       const matchesDay = cls.dayOfWeek === day;
       const matchesCohort = selectedCohort === 'All' || cls.cohortName === selectedCohort;
       return matchesDay && matchesCohort;
@@ -115,14 +145,14 @@ export default function Home() {
   };
 
   // Number of class blocks shown with the current cohort filter, on all days.
-  const visibleCount = countClassesForCohort(schedule, selectedCohort);
+  const visibleCount = countClassesForCohort(termSchedule, selectedCohort);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER & CONTROLS */}
-        <header className="mb-8 flex flex-col justify-between gap-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8 lg:flex-row lg:items-center">
+        <header className="mb-8 flex flex-col gap-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8">
           <div>
             <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
               University Command Center
@@ -132,22 +162,45 @@ export default function Home() {
                 ? 'Loading the timetable...'
                 : loadError
                   ? 'The timetable could not be loaded.'
-                  : schedule.length > 0
+                  : terms.length === 0
+                    ? 'There is no term yet. Add one on the Academic Terms page first.'
+                    : termSchedule.length > 0
                     ? `Viewing ${visibleCount} scheduled class blocks.`
                     : 'No classes scheduled yet. Click generate to start the AI engine.'}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4">
+          {/* The controls wrap onto more lines when they do not fit side by side. */}
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap">
             
+            {terms.length > 0 && (
+              <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-gray-50 p-2">
+                <label htmlFor="timetable-term" className="text-sm font-bold text-gray-500 pl-2">
+                  Term:
+                </label>
+                <select
+                  id="timetable-term"
+                  value={selectedTermId}
+                  onChange={(e) => chooseTerm(e.target.value)}
+                  className="min-w-0 cursor-pointer rounded-lg border-none bg-white py-2 pr-8 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {terms.map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {termLabel(term)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* NEW: Cohort Filter Dropdown */}
             {availableCohorts.length > 0 && (
-              <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+              <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-gray-50 p-2">
                 <span className="text-sm font-bold text-gray-500 pl-2">👥 View:</span>
                 <select 
                   value={selectedCohort} 
                   onChange={(e) => setSelectedCohort(e.target.value)}
-                  className="bg-white border-none text-sm font-semibold rounded-lg py-2 pr-8 focus:ring-2 focus:ring-indigo-500 cursor-pointer outline-none"
+                  className="min-w-0 cursor-pointer rounded-lg border-none bg-white py-2 pr-8 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="All">All University Cohorts (Master View)</option>
                   <optgroup label="Specific Student Groups">
@@ -159,7 +212,9 @@ export default function Home() {
               </div>
             )}
 
-            {schedule.length > 0 && (
+            {/* The two buttons stay together. */}
+            <div className="flex flex-wrap items-center justify-center gap-4">
+            {termSchedule.length > 0 && (
               <button
                 type="button"
                 onClick={() => setConfirmClear(true)}
@@ -172,7 +227,7 @@ export default function Home() {
 
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || isClearing}
+              disabled={isGenerating || isClearing || selectedTermId === ''}
               className={`px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all whitespace-nowrap ${
                 isGenerating 
                   ? 'bg-indigo-400 cursor-not-allowed animate-pulse' 
@@ -181,17 +236,18 @@ export default function Home() {
             >
               {isGenerating ? '🧠 Calculating...' : '✨ Auto-Generate'}
             </button>
+            </div>
           </div>
         </header>
 
         <ConfirmDialog
           open={confirmClear}
-          title="Clear the timetable?"
+          title={`Clear the timetable of ${termName}?`}
           message={`${
-            schedule.length === 1
-              ? 'The scheduled class loses its room, day and time.'
-              : `All ${schedule.length} scheduled classes lose their room, day and time.`
-          } The classes themselves, the course offerings and everything else stay, and Generate places the classes again.`}
+            termSchedule.length === 1
+              ? `The scheduled class of ${termName} loses its room, day and time.`
+              : `All ${termSchedule.length} scheduled classes of ${termName} lose their room, day and time.`
+          } Other terms, the classes themselves, the course offerings and everything else stay, and Generate places the classes again.`}
           confirmLabel={isClearing ? 'Clearing...' : 'Clear timetable'}
           busy={isClearing}
           onConfirm={handleClear}
@@ -222,10 +278,10 @@ export default function Home() {
               onRetry={fetchSchedule}
             />
           </div>
-        ) : schedule.length === 0 ? (
+        ) : termSchedule.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-500">
             <span className="text-4xl mb-4">📅</span>
-            <p>The schedule is currently empty.</p>
+            <p>Nothing of {termName} is in the timetable yet.</p>
             <p className="text-sm mt-1">Click the Auto-Generate button above to let the AI do the work.</p>
           </div>
         ) : (
