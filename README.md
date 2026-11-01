@@ -86,6 +86,9 @@ Open http://localhost:3000.
   Generate keeps the teacher's classes out of them, and brain_server refuses (the page
   shows why) a time off that covers a class of the teacher already in the timetable.
   `lib/teacher-times.ts` lists, names and checks them (`teacher-times.test.mjs`).
+- The "Time Preference" of a teacher (Morning 08:00 - 12:00, Afternoon 13:00 - 17:00,
+  Evening 17:00 - 18:30) is a wish, not a rule: Generate puts their classes at that time
+  when it can, and its message says how many are, and names the classes that are not.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - `npm run lint` reports no problems. The data that brain_server sends is typed where the
   pages read it (`lib/timetable.ts`, the types at the top of each page); request bodies are

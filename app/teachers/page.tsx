@@ -372,14 +372,17 @@ export default function TeachersPage() {
                   {...register('timePreference')}
                   id="teacher-time-preference"
                   aria-invalid={errors.timePreference ? true : undefined}
-                  aria-describedby={errors.timePreference ? 'teacher-time-preference-error' : undefined}
+                  aria-describedby={errors.timePreference ? 'teacher-time-preference-hint teacher-time-preference-error' : 'teacher-time-preference-hint'}
                   className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
                 >
                   <option value="NO_PREFERENCE">No Preference</option>
                   <option value="MORNING">Morning (08:00 - 12:00)</option>
                   <option value="AFTERNOON">Afternoon (13:00 - 17:00)</option>
-                  <option value="EVENING">Evening (17:00+)</option>
+                  <option value="EVENING">Evening (17:00 - 18:30)</option>
                 </select>
+                <p id="teacher-time-preference-hint" className="mt-1 text-xs text-gray-600">
+                  A wish: Generate puts their classes at this time when it can. Times off always come first.
+                </p>
                 {errors.timePreference && <p id="teacher-time-preference-error" className="mt-1 text-xs font-medium text-red-700">{errors.timePreference.message}</p>}
               </div>
 
