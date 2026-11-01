@@ -23,9 +23,12 @@ for (const page of FORM_PAGES) {
     const errorTags = source.match(/<p [^>]*text-red-700[^>]*>\{[\w.]+\.message\}/g) ?? [];
     const unlinked = errorTags.filter((tag) => tag.includes(' id=') === false);
     assert.deepEqual(unlinked, [], 'error message without an id');
-    for (const [, described] of source.matchAll(/aria-describedby=\{[^}]*\? '([^']+)'/g)) {
-      for (const describedId of described.split(' ')) {
-        assert.ok(ids.has(`"${describedId}"`), `aria-describedby points at a missing id: ${describedId}`);
+    // Every text in quotes in an aria-describedby, in each of its branches.
+    for (const [, expression] of source.matchAll(/aria-describedby=\{([^}]*)\}/g)) {
+      for (const [, described] of expression.matchAll(/'([^']+)'/g)) {
+        for (const describedId of described.split(' ')) {
+          assert.ok(ids.has(`"${describedId}"`), `aria-describedby points at a missing id: ${describedId}`);
+        }
       }
     }
   });

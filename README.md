@@ -86,6 +86,12 @@ Open http://localhost:3000.
   Generate keeps the teacher's classes out of them, and brain_server refuses (the page
   shows why) a time off that covers a class of the teacher already in the timetable.
   `lib/teacher-times.ts` lists, names and checks them (`teacher-times.test.mjs`).
+- Under each teacher's maximum hours, the Teachers table shows how long they already
+  teach a week in each term in which they have classes ("Fall 2026: 9 of 12 hrs"; in red
+  when it is over the maximum), and Edit says the lowest maximum brain_server accepts.
+  These are brain_server's own numbers (`weeklyHours` in `GET /professors`): every class
+  counts, in the timetable or not, and the classes of terms whose dates overlap count
+  together. `lib/teacher-hours.ts` writes them (`teacher-hours.test.mjs`).
 - The "Time Preference" of a teacher (Morning 08:00 - 12:00, Afternoon 13:00 - 17:00,
   Evening 17:00 - 18:30) is a wish, not a rule: Generate puts their classes at that time
   when it can, and its message says how many are, and names the classes that are not.
@@ -133,8 +139,9 @@ Text must reach a contrast of 4.5:1 (field borders 3:1): on white, use gray-500 
 small text, and red-700, green-700 or orange-700 for colored text.
 
 Every field needs an `id`, and its label `htmlFor` with the same value. Its error message gets
-`id="FIELD-error"`, and the field `aria-describedby` pointing at it while the error is shown.
-`tests/form-labels.test.mjs` checks this on every form page.
+`id="FIELD-error"`, and the field `aria-describedby` pointing at it while the error is shown
+(and at its hint, `id="FIELD-hint"`, while there is one). `tests/form-labels.test.mjs` checks
+this on every form page, for every id named in `aria-describedby`.
 
 ## Scripts
 
