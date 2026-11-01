@@ -34,6 +34,8 @@ export const api = {
   
   getTerms: () => apiClient.get('/terms').then(res => res.data),
   createTerm: (data: any) => apiClient.post('/terms', data).then(res => res.data),
+  updateTerm: (id: string, data: unknown) => apiClient.patch(`/terms/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteTerm: (id: string) => apiClient.delete(`/terms/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- LOCATIONS ---
   getCampuses: () => apiClient.get('/campuses').then(res => res.data),

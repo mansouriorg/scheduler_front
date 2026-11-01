@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const PAGES_WITH_ROW_ACTIONS = ['teachers', 'classrooms', 'locations', 'cohorts'];
+const PAGES_WITH_ROW_ACTIONS = ['teachers', 'classrooms', 'locations', 'cohorts', 'terms'];
 
 for (const page of PAGES_WITH_ROW_ACTIONS) {
   const source = readFileSync(new URL(`../app/${page}/page.tsx`, import.meta.url), 'utf8');

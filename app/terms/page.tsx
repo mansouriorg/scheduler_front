@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; // <-- 1. Import the API client
 
 // 1. Zod Validation Schema with Date Logic
@@ -33,11 +35,17 @@ export default function TermsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // The term shown in the form for changes (null: the form adds a new term),
+  // and the term waiting in the "Delete?" window.
+  const [editing, setEditing] = useState<Term | null>(null);
+  const [toDelete, setToDelete] = useState<Term | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors },
   } = useForm<TermFormValues>({
     resolver: zodResolver(termSchema),
@@ -83,9 +91,14 @@ export default function TermsPage() {
         endDate: new Date(data.endDate).toISOString(),
       };
 
-      await api.createTerm(payload); // <-- Clean POST request
-
-      setNotice({ type: 'success', text: 'Term saved.' });
+      if (editing) {
+        await api.updateTerm(editing.id, payload);
+        setNotice({ type: 'success', text: `${data.name} was updated.` });
+        setEditing(null);
+      } else {
+        await api.createTerm(payload); // <-- Clean POST request
+        setNotice({ type: 'success', text: 'Term saved.' });
+      }
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
@@ -93,6 +106,44 @@ export default function TermsPage() {
       setNotice({ type: 'error', text: `Could not save the term. ${getErrorMessage(error)}` });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Puts a term from the table into the form, to change it. The date fields
+  // take "YYYY-MM-DD", the first 10 characters of the dates the server sends.
+  const startEdit = (term: Term) => {
+    setEditing(term);
+    setNotice(null);
+    reset({
+      name: term.name,
+      type: term.type,
+      startDate: term.startDate.slice(0, 10),
+      endDate: term.endDate.slice(0, 10),
+    });
+    setFocus('name');
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    reset();
+  };
+
+  // Runs when "Delete" is confirmed in the window. The server refuses while the
+  // term has course offerings; its message (why, and what to do) is shown as it is.
+  const confirmDelete = async () => {
+    if (toDelete === null) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteTerm(toDelete.id);
+      setNotice({ type: 'success', text: `${toDelete.name} was deleted.` });
+      if (editing?.id === toDelete.id) cancelEdit();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not delete ${toDelete.name}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsDeleting(false);
+      setToDelete(null);
     }
   };
 
@@ -110,12 +161,21 @@ export default function TermsPage() {
       <div className="max-w-7xl mx-auto">
         <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Academic Terms</h1>
         <Notice message={notice} onDismiss={setNotice} />
+        <ConfirmDialog
+          open={toDelete !== null}
+          title={`Delete ${toDelete?.name ?? 'this term'}?`}
+          message="This cannot be undone. A term with course offerings cannot be deleted; you will see a message instead."
+          confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+          busy={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* LEFT COLUMN: THE FORM */}
           <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">Add New Semester</h2>
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${editing.name}` : 'Add New Semester'}</h2>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               
@@ -178,8 +238,17 @@ export default function TermsPage() {
                 disabled={isSubmitting}
                 className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Save Term'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Save Term'}
               </button>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              )}
             </form>
           </div>
 
@@ -197,27 +266,28 @@ export default function TermsPage() {
                     <th className="p-4 font-medium">Type</th>
                     <th className="p-4 font-medium">Start Date</th>
                     <th className="p-4 font-medium">End Date</th>
+                    <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {isLoading ? (
-                    <StatusRow colSpan={4} message="Loading terms..." />
+                    <StatusRow colSpan={5} message="Loading terms..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={4}
+                      colSpan={5}
                       tone="error"
                       message={`Could not load the terms. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : terms.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-gray-500">
+                      <td colSpan={5} className="p-8 text-center text-gray-500">
                         No terms found. Create a semester to begin scheduling.
                       </td>
                     </tr>
                   ) : (
                     terms.map((term) => (
-                      <tr key={term.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={term.id} className={editing?.id === term.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
                         <td className="p-4 font-bold text-gray-900">{term.name}</td>
                         <td className="p-4 text-gray-600">
                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700">
@@ -226,6 +296,28 @@ export default function TermsPage() {
                         </td>
                         <td className="p-4 text-gray-600">{formatDate(term.startDate)}</td>
                         <td className="p-4 text-gray-600">{formatDate(term.endDate)}</td>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(term)}
+                              aria-label={`Edit ${term.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setToDelete(term)}
+                              aria-label={`Delete ${term.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              Delete
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}

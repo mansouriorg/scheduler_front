@@ -45,7 +45,7 @@ Open http://localhost:3000.
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
 | `/courses`    | `app/courses/page.tsx`    | add and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add, edit, delete and list student groups and their headcount |
-| `/terms`      | `app/terms/page.tsx`      | add and list academic terms and their dates         |
+| `/terms`      | `app/terms/page.tsx`      | add, edit, delete and list academic terms and their dates |
 | `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term    |
 
 - The API calls are in `lib/api.ts`.
@@ -64,6 +64,8 @@ Open http://localhost:3000.
   delete one that still has something inside, and the page shows its reason.
 - Cohorts can be edited and deleted from their table. brain_server refuses to delete a
   cohort that has course offerings or students, and the page shows its reason.
+- Terms can be edited and deleted from their table. brain_server refuses to delete a term
+  that has course offerings, and the page shows its reason.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).
