@@ -5,9 +5,13 @@ import { api } from '@/lib/api';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
 import { countClassesForCohort } from '@/lib/timetable';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
+  // The "Clear the timetable?" window, and whether the clearing is running.
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
@@ -81,6 +85,24 @@ export default function Home() {
     }
   };
 
+  // Runs when "Clear timetable" is confirmed in the window: every class loses its
+  // room, day and time, so the next Generate places all of them again.
+  const handleClear = async () => {
+    setIsClearing(true);
+    try {
+      const res = await api.clearTimetable();
+      setMessage({ text: res.message, type: 'success' });
+      setSelectedCohort('All');
+      await fetchSchedule();
+    } catch (error) {
+      console.error(error);
+      setMessage({ text: `Could not clear the timetable. ${getErrorMessage(error)}`, type: 'error' });
+    } finally {
+      setIsClearing(false);
+      setConfirmClear(false);
+    }
+  };
+
   // UPDATED: Now filters by the selected cohort!
   const getClassesForDay = (day: string) => {
     return schedule.filter((cls) => {
@@ -135,9 +157,20 @@ export default function Home() {
               </div>
             )}
 
+            {schedule.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                disabled={isGenerating || isClearing}
+                className="whitespace-nowrap rounded-xl border border-gray-300 bg-white px-5 py-3 font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear timetable
+              </button>
+            )}
+
             <button
               onClick={handleGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || isClearing}
               className={`px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all whitespace-nowrap ${
                 isGenerating 
                   ? 'bg-indigo-400 cursor-not-allowed animate-pulse' 
@@ -148,6 +181,20 @@ export default function Home() {
             </button>
           </div>
         </header>
+
+        <ConfirmDialog
+          open={confirmClear}
+          title="Clear the timetable?"
+          message={`${
+            schedule.length === 1
+              ? 'The scheduled class loses its room, day and time.'
+              : `All ${schedule.length} scheduled classes lose their room, day and time.`
+          } The classes themselves, the course offerings and everything else stay, and Generate places the classes again.`}
+          confirmLabel={isClearing ? 'Clearing...' : 'Clear timetable'}
+          busy={isClearing}
+          onConfirm={handleClear}
+          onCancel={() => setConfirmClear(false)}
+        />
 
         {/* FEEDBACK MESSAGE */}
         {message && (

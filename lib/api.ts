@@ -63,4 +63,5 @@ export const api = {
 
   // --- SCHEDULER (THE BRAIN BRIDGE) ---
   generateSchedule: () => apiClient.post('/scheduler/generate').then(res => res.data),
+  clearTimetable: () => apiClient.delete('/scheduler/timetable').then(res => res.data),
 };
