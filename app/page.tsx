@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
-import { countClassesForCohort, roomLabel } from '@/lib/timetable';
+import { countClassesForCohort, roomLabel, teacherLabel } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function Home() {
@@ -26,7 +26,8 @@ export default function Home() {
   const fetchSchedule = async () => {
     setIsLoadingSchedule(true);
     try {
-      const offerings = await api.getOfferings();
+      // The offerings with their classes, and the teachers to name them.
+      const [offerings, teachers] = await Promise.all([api.getOfferings(), api.getTeachers()]);
       
       const scheduledClasses: any[] = [];
       
@@ -43,6 +44,7 @@ export default function Home() {
               startTime: cls.startTime,
               endTime: cls.endTime,
               room: roomLabel(cls.room), // for example Lab 304, Science Hub (SCI) - Level 3
+              teacher: teacherLabel(cls.assignedProfessorId, teachers),
             });
           }
         });
@@ -267,6 +269,9 @@ export default function Home() {
                         
                         <div className="text-xs font-semibold text-gray-600 bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100 mt-1">
                           📍 {cls.room}
+                        </div>
+                        <div className="mt-2 text-xs font-medium text-gray-700">
+                          <span className="text-gray-500">Teacher:</span> {cls.teacher}
                         </div>
                       </div>
                     ))

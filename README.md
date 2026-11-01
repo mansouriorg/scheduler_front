@@ -39,7 +39,7 @@ Open http://localhost:3000.
 
 | Path          | File                      | What you do there                                   |
 |---------------|---------------------------|-----------------------------------------------------|
-| `/`           | `app/page.tsx`            | see the timetable, filter by cohort, generate it or clear it |
+| `/`           | `app/page.tsx`            | see the timetable (each class with its room and teacher), filter by cohort, generate it or clear it |
 | `/locations`  | `app/locations/page.tsx`  | add, edit, move, delete and list campuses, buildings and floors |
 | `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
@@ -82,7 +82,7 @@ Open http://localhost:3000.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page and names the room of
-  each class with its building and floor (tested in `timetable.test.mjs`).
+  each class with its building and floor, and its teacher (tested in `timetable.test.mjs`).
 - "Clear timetable" on the home page takes the room, day and time off every class after
   asking first; Generate then places them again. `tests/clear-timetable.test.mjs` checks
   that the button only opens the confirmation window.
