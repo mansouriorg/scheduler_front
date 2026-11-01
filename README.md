@@ -76,7 +76,8 @@ Open http://localhost:3000.
   refuses to delete an offering with enrolled students, and the page shows its reason.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
-- `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).
+- `lib/timetable.ts` counts the class blocks shown on the home page and names the room of
+  each class with its building and floor (tested in `timetable.test.mjs`).
 - "Clear timetable" on the home page takes the room, day and time off every class after
   asking first; Generate then places them again. `tests/clear-timetable.test.mjs` checks
   that the button only opens the confirmation window.

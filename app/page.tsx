@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
-import { countClassesForCohort } from '@/lib/timetable';
+import { countClassesForCohort, roomLabel } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
 export default function Home() {
@@ -42,7 +42,7 @@ export default function Home() {
               dayOfWeek: cls.dayOfWeek,
               startTime: cls.startTime,
               endTime: cls.endTime,
-              roomId: cls.assignedRoomId,
+              room: roomLabel(cls.room), // for example Lab 304, Science Hub (SCI) - Level 3
             });
           }
         });
@@ -266,7 +266,7 @@ export default function Home() {
                         )}
                         
                         <div className="text-xs font-semibold text-gray-600 bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100 mt-1">
-                          📍 Room ID: {cls.roomId.slice(0, 8)}...
+                          📍 {cls.room}
                         </div>
                       </div>
                     ))
