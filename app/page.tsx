@@ -25,6 +25,7 @@ import {
 } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { generateNotice } from '@/lib/generate-result';
+import { browserStorage, readHomeChoice, saveHomeChoice, startChoice, type HomeChoice } from '@/lib/home-choice';
 
 // The printed week (Print week): landscape pages, so that the six days fit side by side.
 const PRINT_PAGE = '@page { size: landscape; margin: 10mm; }';
@@ -45,8 +46,11 @@ export default function Home() {
   // The term whose timetable is shown, generated and cleared, and the View list:
   // every class, or the week of one cohort, teacher or room (see lib/timetable.ts).
   const [terms, setTerms] = useState<TermChoice[]>([]);
-  const [selectedTermId, setSelectedTermId] = useState('');
-  const [selectedView, setSelectedView] = useState<string>(ALL_CLASSES);
+  // Both are one state, so that loading the terms sets them together without
+  // reading them (see lib/home-choice.ts).
+  const [termAndView, setTermAndView] = useState<HomeChoice>({ termId: '', view: ALL_CLASSES });
+  const selectedTermId = termAndView.termId;
+  const selectedView = termAndView.view;
 
   const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
@@ -90,12 +94,17 @@ export default function Home() {
       setUnplaced(unplacedClasses(offerings, teachers));
       setLoadError(null);
 
-      // Keep the chosen term while it exists; otherwise start with the term
-      // going on today, the next one, or the latest one.
+      // Keep the chosen term and View while the term exists. Otherwise (at first, or
+      // when it was deleted) start with the term and View chosen last in this browser,
+      // or else with the term going on today, the next one, or the latest one, and
+      // every class.
       setTerms(termList);
-      setSelectedTermId((current) =>
-        termList.some((term: TermChoice) => term.id === current) ? current : defaultTermId(termList, localDay(new Date())),
+      const start = startChoice(
+        termList.map((term: TermChoice) => term.id),
+        readHomeChoice(browserStorage()),
+        { termId: defaultTermId(termList, localDay(new Date())), view: ALL_CLASSES },
       );
+      setTermAndView((current) => (termList.some((term: TermChoice) => term.id === current.termId) ? current : start));
       
     } catch (error) {
       console.error('Failed to fetch schedule:', error);
@@ -108,6 +117,11 @@ export default function Home() {
   useEffect(() => {
     fetchSchedule();
   }, []);
+
+  // Remembers the term and View in this browser for the next visit (lib/home-choice.ts).
+  useEffect(() => {
+    if (selectedTermId !== '') saveHomeChoice(browserStorage(), { termId: selectedTermId, view: selectedView });
+  }, [selectedTermId, selectedView]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -132,7 +146,7 @@ export default function Home() {
     try {
       const res = await api.clearTimetable(selectedTermId);
       setMessage({ text: res.message, type: 'success' });
-      setSelectedView(ALL_CLASSES);
+      setTermAndView((current) => ({ ...current, view: ALL_CLASSES }));
       await fetchSchedule();
     } catch (error) {
       console.error(error);
@@ -145,8 +159,7 @@ export default function Home() {
 
   // Another term: its own timetable, all its classes.
   const chooseTerm = (termId: string) => {
-    setSelectedTermId(termId);
-    setSelectedView(ALL_CLASSES);
+    setTermAndView({ termId, view: ALL_CLASSES });
     setMessage(null);
   };
 
@@ -224,7 +237,7 @@ export default function Home() {
                   id="timetable-view"
                   aria-label="View"
                   value={view}
-                  onChange={(e) => setSelectedView(e.target.value)}
+                  onChange={(e) => setTermAndView({ termId: selectedTermId, view: e.target.value })}
                   className="min-w-0 cursor-pointer rounded-lg border-none bg-white py-2 pr-8 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value={ALL_CLASSES}>All classes (master view)</option>

@@ -162,6 +162,13 @@ Open http://localhost:3000.
   cohort, one teacher or one room (the cohorts, teachers and rooms of that term's
   timetable, by name). Another term, or Clear, shows every class again.
   `viewChoices` and `inView` in `lib/timetable.ts` make the list and choose the classes.
+- The home page remembers the term and the View chosen last in this browser
+  (localStorage), so a reload or the next visit shows the same week. If that term was
+  deleted since, it starts with the term going on today and every class; a cohort,
+  teacher or room that the term no longer has shows every class. Where the browser
+  blocks the storage, the page works the same and only does not remember. Only these
+  two values are kept, and only in this browser. `lib/home-choice.ts`
+  (`home-choice.test.mjs`; `tests/home-choice.test.mjs` checks the page).
 - Above the timetable, a list that opens on click says how many classes of the term (in
   the chosen view) are not in the timetable yet, and names each one with its length and
   teacher; Generate places them. `unplacedClasses` in `lib/timetable.ts` finds them.
