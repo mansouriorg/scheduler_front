@@ -94,6 +94,11 @@ Open http://localhost:3000.
   smaller laptops. Each value then has its column name in front of it. The class names are
   in `lib/table-cards.ts` (`table-cards.test.mjs`; `tests/table-cards.test.mjs` checks the
   pages).
+- After Generate, the home page shows a short summary ("12 classes were placed in the
+  timetable of Fall 2026.") and, as a list under it, the notes from brain_server: the
+  classes on Saturday, before their lecture, or outside the time their teacher prefers
+  (`lib/generate-result.ts`, `generate-result.test.mjs`). The message box is read out by
+  screen readers when it changes.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - `npm run lint` reports no problems. The data that brain_server sends is typed where the
   pages read it (`lib/timetable.ts`, the types at the top of each page); request bodies are

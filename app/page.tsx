@@ -16,13 +16,15 @@ import {
   type TimetableClass,
 } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { generateNotice } from '@/lib/generate-result';
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   // The "Clear the timetable?" window, and whether the clearing is running.
   const [confirmClear, setConfirmClear] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  // The feedback above the timetable; notes are shown as a list under the text.
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; notes?: string[] } | null>(null);
   const [schedule, setSchedule] = useState<TimetableClass[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,8 +97,8 @@ export default function Home() {
     setMessage({ text: '🧠 Python Brain is crunching millions of possibilities...', type: 'info' });
     
     try {
-      const res = await api.generateSchedule(selectedTermId);
-      setMessage({ text: res.message || '✨ Schedule successfully generated!', type: 'success' });
+      const notice = generateNotice(await api.generateSchedule(selectedTermId));
+      setMessage({ text: notice.text, notes: notice.notes, type: 'success' });
       await fetchSchedule();
     } catch (error) {
       console.error(error);
@@ -258,12 +260,19 @@ export default function Home() {
 
         {/* FEEDBACK MESSAGE */}
         {message && (
-          <div className={`mb-6 text-sm font-medium px-4 py-3 rounded-xl border ${
+          <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 text-sm font-medium px-4 py-3 rounded-xl border ${
             message.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 
             message.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 
             'bg-blue-50 text-blue-700 border-blue-200'
           }`}>
             {message.text}
+            {message.notes && message.notes.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 font-normal">
+                {message.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
