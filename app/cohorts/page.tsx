@@ -11,6 +11,8 @@ import { NoMatchRow, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { SortHeader, SortSelect } from '@/components/table-sort';
 import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
+import { defaultTermId, localDay, type TermChoice } from '@/lib/timetable';
+import { cohortHours, cohortHoursText, notPlacedText, type CohortHours, type CohortHoursOffering } from '@/lib/cohort-hours';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -28,7 +30,7 @@ type Cohort = CohortFormValues & { id: string };
 
 // Where the box of the table is narrower than 36rem, each cohort is shown as a
 // card (see lib/table-cards.ts).
-const cards = TABLE_CARDS['xl'];
+const cards = TABLE_CARDS['2xl'];
 
 export default function CohortsPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
@@ -41,6 +43,9 @@ export default function CohortsPage() {
   const [search, setSearch] = useState('');
   // The column the table is sorted by, and which way (null: as brain_server sends it).
   const [sort, setSort] = useState<Sort>(null);
+  // How many hours a week each cohort has classes in the timetable of one term (see
+  // lib/cohort-hours.ts); null until it is loaded, or when it could not be loaded.
+  const [weeklyHours, setWeeklyHours] = useState<CohortHours | null>(null);
   // The cohort shown in the form for changes (null: the form adds a new cohort),
   // and the cohort waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Cohort | null>(null);
@@ -75,6 +80,27 @@ export default function CohortsPage() {
       }
     };
     fetchCohorts();
+  }, [refreshTrigger]);
+
+  // The weekly hours of each cohort in the term going on today (else the next term, else
+  // the latest one). They load apart from the cohorts, so that the table does not wait
+  // for them; if they cannot load, only the Weekly Hours column says "Not known".
+  useEffect(() => {
+    const fetchWeeklyHours = async () => {
+      try {
+        const [offerings, terms]: [CohortHoursOffering[], TermChoice[]] = await Promise.all([
+          api.getOfferings(),
+          api.getTerms(),
+        ]);
+        const termId = defaultTermId(terms, localDay(new Date()));
+        const term = terms.find((candidate) => candidate.id === termId);
+        setWeeklyHours(term ? cohortHours(offerings, term.id, term.name) : { termName: '', placed: {}, unplaced: {} });
+      } catch (error) {
+        console.error('Failed to fetch the weekly hours of the cohorts', error);
+        setWeeklyHours(null);
+      }
+    };
+    fetchWeeklyHours();
   }, [refreshTrigger]);
 
   const retryLoad = () => {
@@ -144,10 +170,16 @@ export default function CohortsPage() {
     }
   };
 
+  // The minutes a week of the cohort's classes in the timetable, and of those that are
+  // not in it yet (0 while not known).
+  const minutesPlaced = (cohort: Cohort) => weeklyHours?.placed[cohort.id] ?? 0;
+  const minutesUnplaced = (cohort: Cohort) => weeklyHours?.unplaced[cohort.id] ?? 0;
+
   // The columns the table can be sorted by (see lib/table-sort.ts).
   const sortColumns: SortColumn<Cohort>[] = [
     { key: 'name', label: 'Cohort Name', kind: 'text', value: (cohort) => cohort.name },
     { key: 'headcount', label: 'Headcount', kind: 'number', value: (cohort) => cohort.headcount },
+    { key: 'hours', label: 'Weekly Hours', kind: 'number', value: (cohort) => minutesPlaced(cohort) },
     { key: 'term', label: 'Current Term', kind: 'text', value: (cohort) => cohort.currentSemester.replace('_', ' ') },
   ];
 
@@ -266,9 +298,16 @@ export default function CohortsPage() {
               count={searchCount(shownCohorts.length, cohorts.length, search, 'cohort', 'cohorts')}
               sorted={sortText(sortColumns, sort)}
               badge={
-                <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
-                  Total Groups: {cohorts.length}
-                </span>
+                <>
+                  <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                    Total Groups: {cohorts.length}
+                  </span>
+                  {weeklyHours && weeklyHours.termName && (
+                    <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                      Weekly hours in {weeklyHours.termName}
+                    </span>
+                  )}
+                </>
               }
             />
             
@@ -279,28 +318,29 @@ export default function CohortsPage() {
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <SortHeader columns={sortColumns} columnKey="name" sort={sort} onSort={setSort} />
                     <SortHeader columns={sortColumns} columnKey="headcount" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="hours" sort={sort} onSort={setSort} />
                     <SortHeader columns={sortColumns} columnKey="term" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
-                    <StatusRow colSpan={4} message="Loading cohorts..." />
+                    <StatusRow colSpan={5} message="Loading cohorts..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={4}
+                      colSpan={5}
                       tone="error"
                       message={`Could not load the cohorts. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : cohorts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-gray-500">
+                      <td colSpan={5} className="p-8 text-center text-gray-500">
                         No cohorts registered. Add a student group to get started.
                       </td>
                     </tr>
                   ) : shownCohorts.length === 0 ? (
-                    <NoMatchRow colSpan={4} text={noMatchText(search, 'cohort')} inputId="search-cohorts" onClear={() => setSearch('')} />
+                    <NoMatchRow colSpan={5} text={noMatchText(search, 'cohort')} inputId="search-cohorts" onClear={() => setSearch('')} />
                   ) : (
                     shownCohorts.map((cohort) => (
                       <tr key={cohort.id} className={`${cards.row} ${editing?.id === cohort.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
@@ -312,6 +352,21 @@ export default function CohortsPage() {
                               {cohort.headcount} Students
                             </span>
                           </span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Weekly Hours</span>
+                          {weeklyHours === null ? (
+                            <span className="text-gray-500">Not known</span>
+                          ) : (
+                            <span>
+                              <span className={minutesPlaced(cohort) === 0 && minutesUnplaced(cohort) === 0 ? 'text-gray-500' : undefined}>
+                                {cohortHoursText(minutesPlaced(cohort), minutesUnplaced(cohort))}
+                              </span>
+                              {notPlacedText(minutesUnplaced(cohort)) && (
+                                <span className="block text-xs font-medium text-amber-800">{notPlacedText(minutesUnplaced(cohort))}</span>
+                              )}
+                            </span>
+                          )}
                         </td>
                         <td className={`${cards.cell} text-gray-600`}>
                           <span className={cards.label}>Current Term</span>

@@ -13,7 +13,7 @@ const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf
 const PAGES = [
   ['teachers', 'teachers', 'sort-teachers', ['name', 'department', 'maxHours']],
   ['classrooms', 'rooms', 'sort-rooms', ['name', 'type', 'capacity', 'use', 'location']],
-  ['cohorts', 'cohorts', 'sort-cohorts', ['name', 'headcount', 'term']],
+  ['cohorts', 'cohorts', 'sort-cohorts', ['name', 'headcount', 'hours', 'term']],
   ['courses', 'courses', 'sort-courses', ['code', 'title', 'hours', 'credits']],
   ['terms', 'terms', 'sort-terms', ['name', 'type', 'start', 'end']],
 ];

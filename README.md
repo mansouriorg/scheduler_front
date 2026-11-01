@@ -153,6 +153,14 @@ Open http://localhost:3000.
   rooms: if the timetable cannot load, the rooms still show and the column says "Not
   known". `lib/room-use.ts` (`room-use.test.mjs`; `tests/room-use.test.mjs` checks the
   page).
+- The Cohorts table has a "Weekly Hours" column: how many hours a week each cohort has
+  classes in the timetable of the same term as Weekly Use, for example "13.5 hrs a week".
+  Classes of that term that are not placed yet are said on a second line ("2 hrs not
+  placed yet"), and "No classes" when the cohort has none in that term. The term is said
+  next to the title, the column sorts like the others, and it loads apart from the
+  cohorts ("Not known" when the timetable cannot load). With five columns the table is
+  shown from a box of 42rem (`2xl`), and as cards below that. `lib/cohort-hours.ts`
+  (`cohort-hours.test.mjs`; `tests/cohort-hours.test.mjs` checks the page).
 - Course Offerings, a list of cards, has the "Sort by" list only, always shown: by course
   or cohort (A to Z), by term (by its start date), or by "Classes to place" (the classes
   that are not in the timetable yet; highest first puts the offerings Generate still has

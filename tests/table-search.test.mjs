@@ -70,7 +70,7 @@ test('locations: the tree shows only the campuses and buildings found by the sea
 
 test('cohorts: the number of cohorts stays next to the title', () => {
   const source = read('app/cohorts/page.tsx');
-  assert.match(source, /\sbadge=\{\s*<span [^>]*>\s*Total Groups: \{cohorts\.length\}\s*<\/span>\s*\}/);
+  assert.match(source, /\sbadge=\{\s*(<>\s*)?<span [^>]*>\s*Total Groups: \{cohorts\.length\}\s*<\/span>/);
   assert.match(read('components/table-search.tsx'), /<h2 className="text-xl font-semibold text-gray-800">\{title\}<\/h2>\s*\{badge\}/);
 });
 
