@@ -63,7 +63,8 @@ export function AppSidebar() {
 
   return (
     <>
-      <div className="flex items-center justify-between bg-gray-900 px-4 py-3 text-white md:hidden">
+      {/* The menu is not printed. */}
+      <div className="flex items-center justify-between bg-gray-900 px-4 py-3 text-white md:hidden print:hidden">
         <Brand />
         <button
           type="button"
@@ -83,14 +84,14 @@ export function AppSidebar() {
           tabIndex={-1}
           aria-label="Close menu"
           onClick={close}
-          className="fixed inset-0 z-30 bg-gray-950/50 md:hidden"
+          className="fixed inset-0 z-30 bg-gray-950/50 md:hidden print:hidden"
         />
       )}
 
       <nav
         id="main-menu"
         aria-label="Main"
-        className={`${isOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-64 flex-shrink-0 flex-col bg-gray-900 text-white shadow-xl md:static md:z-10 md:flex`}
+        className={`${isOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} w-64 flex-shrink-0 flex-col bg-gray-900 text-white shadow-xl md:static md:z-10 md:flex print:hidden`}
       >
         <div className="flex items-start justify-between border-b border-gray-800 p-6">
           <Brand />

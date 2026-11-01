@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex h-screen flex-col overflow-hidden bg-gray-50 text-gray-900 md:flex-row`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex h-screen flex-col overflow-hidden bg-gray-50 text-gray-900 md:flex-row print:block print:h-auto print:overflow-visible print:bg-white`}
       >
         {/* Lets keyboard users jump over the menu straight to the page content. */}
         <a
@@ -39,8 +39,9 @@ export default function RootLayout({
         {/* Sidebar on tablets and computers; top bar with a menu button on phones. */}
         <AppSidebar />
 
-        {/* The page content scrolls on its own, next to (or below) the menu. */}
-        <main id="main" tabIndex={-1} className="relative flex-1 overflow-y-auto focus:outline-none">
+        {/* The page content scrolls on its own, next to (or below) the menu. On paper
+            there is no menu, and the content runs over as many pages as it needs. */}
+        <main id="main" tabIndex={-1} className="relative flex-1 overflow-y-auto focus:outline-none print:overflow-visible">
           {children}
         </main>
       </body>

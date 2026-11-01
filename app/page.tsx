@@ -10,6 +10,7 @@ import {
   defaultTermId,
   inView,
   localDay,
+  printHeading,
   roomLabel,
   teacherLabel,
   termLabel,
@@ -24,6 +25,9 @@ import {
 } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { generateNotice } from '@/lib/generate-result';
+
+// The printed week (Print week): landscape pages, so that the six days fit side by side.
+const PRINT_PAGE = '@page { size: landscape; margin: 10mm; }';
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -165,16 +169,18 @@ export default function Home() {
   const termUnplaced = unplaced.filter((cls) => cls.termId === selectedTermId && inView(cls, view));
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8 print:min-h-0 print:bg-white print:p-0">
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER & CONTROLS */}
-        <header className="mb-8 flex flex-col gap-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8">
+        <header className="mb-8 flex flex-col gap-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8 print:mb-3 print:gap-0 print:border-0 print:p-0 print:shadow-none">
           <div>
-            <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
+            <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl print:hidden">
               University Command Center
             </h1>
-            <p className="text-gray-500">
+            {/* On paper: whose week it is, instead of the title and the controls. */}
+            <p className="hidden text-lg font-bold print:block">{printHeading(termName, shown?.label, visibleCount)}</p>
+            <p className="text-gray-500 print:hidden">
               {isLoadingSchedule
                 ? 'Loading the timetable...'
                 : loadError
@@ -188,7 +194,7 @@ export default function Home() {
           </div>
 
           {/* The controls wrap onto more lines when they do not fit side by side. */}
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap print:hidden">
             
             {terms.length > 0 && (
               <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-gray-50 p-2">
@@ -245,8 +251,17 @@ export default function Home() {
               </div>
             )}
 
-            {/* The two buttons stay together. */}
+            {/* The buttons stay together. */}
             <div className="flex flex-wrap items-center justify-center gap-4">
+            {termSchedule.length > 0 && (
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="whitespace-nowrap rounded-xl border border-gray-300 bg-white px-5 py-3 font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                Print week
+              </button>
+            )}
             {termSchedule.length > 0 && (
               <button
                 type="button"
@@ -289,7 +304,7 @@ export default function Home() {
 
         {/* FEEDBACK MESSAGE */}
         {message && (
-          <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 text-sm font-medium px-4 py-3 rounded-xl border ${
+          <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 text-sm font-medium px-4 py-3 rounded-xl border print:hidden ${
             message.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 
             message.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 
             'bg-blue-50 text-blue-700 border-blue-200'
@@ -307,7 +322,7 @@ export default function Home() {
 
         {/* The classes not in the timetable yet: open the list to see them. */}
         {isLoadingSchedule === false && loadError === null && termUnplaced.length > 0 && (
-          <details className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <details className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">
             <summary className="cursor-pointer font-semibold">
               {unplacedSummary(termUnplaced.length, shown ? shown.label : termName)}
             </summary>
@@ -340,48 +355,49 @@ export default function Home() {
             <p className="text-sm mt-1">Click the Auto-Generate button above to let the AI do the work.</p>
           </div>
         ) : (
-          <div className="flex gap-6 overflow-x-auto pb-8 snap-x">
+          // On paper the six days are side by side, each as long as it needs (see PRINT_PAGE).
+          <div className="flex gap-6 overflow-x-auto pb-8 snap-x print:grid print:grid-cols-6 print:gap-2 print:overflow-visible print:pb-0">
             {DAYS.map((day) => (
-              <div key={day} className="min-w-[320px] flex-1 snap-start">
-                <div className="bg-gray-800 text-white font-bold py-3 px-4 rounded-t-xl text-center tracking-widest text-sm mb-2 shadow-sm">
+              <div key={day} className="min-w-[320px] flex-1 snap-start print:min-w-0">
+                <div className="bg-gray-800 text-white font-bold py-3 px-4 rounded-t-xl text-center tracking-widest text-sm mb-2 shadow-sm print:mb-1 print:rounded-none print:border-b-2 print:border-gray-900 print:bg-white print:px-0 print:py-1 print:text-xs print:text-gray-900 print:shadow-none">
                   {day}
                 </div>
                 
-                <div className="flex flex-col gap-3 h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="flex flex-col gap-3 h-[700px] overflow-y-auto pr-2 custom-scrollbar print:h-auto print:gap-1.5 print:overflow-visible print:pr-0">
                   {getClassesForDay(day).length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-100 py-4 text-center text-sm text-gray-600">
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-100 py-4 text-center text-sm text-gray-600 print:py-1 print:text-xs">
                       No classes
                     </div>
                   ) : (
                     getClassesForDay(day).map((cls, idx) => (
                       <div 
                         key={`${cls.id}-${idx}`} 
-                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-indigo-300 transition-colors border-l-4 border-l-indigo-500"
+                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-indigo-300 transition-colors border-l-4 border-l-indigo-500 print:break-inside-avoid print:rounded-md print:border-gray-400 print:p-1.5 print:shadow-none"
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="bg-indigo-50 text-indigo-700 text-xs font-black px-2 py-1 rounded">
+                        <div className="flex justify-between items-start mb-2 print:mb-1 print:flex-wrap print:gap-1">
+                          <span className="bg-indigo-50 text-indigo-700 text-xs font-black px-2 py-1 rounded print:p-0">
                             {cls.startTime} - {cls.endTime}
                           </span>
-                          <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-1 rounded uppercase">
+                          <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-1 rounded uppercase print:p-0">
                             {cls.type}
                           </span>
                         </div>
                         
-                        <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1">
+                        <h3 className="font-bold text-gray-900 text-sm leading-tight mb-1 print:text-xs">
                           {cls.courseCode}: {cls.courseTitle}
                         </h3>
                         
                         {/* The cohort, unless the view shows only that cohort's classes. */}
                         {view.startsWith('cohort:') === false && (
-                          <div className="text-xs font-medium text-gray-500 mb-2">
+                          <div className="text-xs font-medium text-gray-500 mb-2 print:mb-0.5">
                             👥 {cls.cohortName}
                           </div>
                         )}
                         
-                        <div className="text-xs font-semibold text-gray-600 bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100 mt-1">
+                        <div className="text-xs font-semibold text-gray-600 bg-gray-50 inline-block px-2 py-1 rounded border border-gray-100 mt-1 print:mt-0 print:border-0 print:p-0">
                           📍 {cls.room}
                         </div>
-                        <div className="mt-2 text-xs font-medium text-gray-700">
+                        <div className="mt-2 text-xs font-medium text-gray-700 print:mt-0.5">
                           <span className="text-gray-500">Teacher:</span> {cls.teacher}
                         </div>
                       </div>
@@ -399,6 +415,7 @@ export default function Home() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e5e7eb; border-radius: 20px; }
+        ${PRINT_PAGE}
       `}} />
     </div>
   );

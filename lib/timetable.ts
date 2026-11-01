@@ -186,3 +186,10 @@ export function unplacedSummary(count: number, of: string): string {
 export function unplacedLabel(cls: UnplacedClass): string {
   return `${cls.courseCode} ${cls.type} for ${cls.cohortName}: ${cls.durationMinutes} mins, ${cls.teacher}`;
 }
+
+// The line at the top of the printed week (Print week on the home page): the term,
+// the cohort, teacher or room of the View list, and the number of class blocks.
+// "Fall 2026 timetable: Dr. Amal Ben Salah (2 class blocks)"
+export function printHeading(term: string, view: string | undefined, count: number): string {
+  return `${term} timetable: ${view ?? 'all classes'} (${count} ${count === 1 ? 'class block' : 'class blocks'})`;
+}

@@ -140,6 +140,14 @@ Open http://localhost:3000.
 - Above the timetable, a list that opens on click says how many classes of the term (in
   the chosen view) are not in the timetable yet, and names each one with its length and
   teacher; Generate places them. `unplacedClasses` in `lib/timetable.ts` finds them.
+- "Print week" on the home page prints the week shown (or saves it as a PDF from the
+  browser's print window): one line says the term and the cohort, teacher or room
+  (`printHeading` in `lib/timetable.ts`), then the six days side by side on a landscape
+  page, each day as long as it needs, over more pages if it must. The menu, the
+  controls and the messages are left out with Tailwind's `print:` classes (in
+  `app/layout.tsx`, `components/app-sidebar.tsx` and `app/page.tsx`).
+  `tests/print-week.test.mjs` checks the button and these classes. To print the colours
+  too, turn on "Background graphics" (Chrome) or "Print backgrounds" (Safari).
 - The home page works on one term at a time: it shows the timetable of the chosen term,
   Generate places only that term's classes, and "Clear timetable" takes the room, day and
   time off that term's classes after asking first (other terms stay); Generate then places
