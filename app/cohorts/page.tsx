@@ -101,8 +101,9 @@ export default function CohortsPage() {
       name: cohort.name,
       headcount: cohort.headcount,
       currentSemester: cohort.currentSemester,
-    });
-    setFocus('name');
+    }, { keepDefaultValues: true }); // Cancel and Save then empty the form again
+    // reset attaches the fields again on the next render; focus after that.
+    setTimeout(() => setFocus('name'), 0);
   };
 
   const cancelEdit = () => {

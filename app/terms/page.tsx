@@ -119,8 +119,9 @@ export default function TermsPage() {
       type: term.type,
       startDate: term.startDate.slice(0, 10),
       endDate: term.endDate.slice(0, 10),
-    });
-    setFocus('name');
+    }, { keepDefaultValues: true }); // Cancel and Save then empty the form again
+    // reset attaches the fields again on the next render; focus after that.
+    setTimeout(() => setFocus('name'), 0);
   };
 
   const cancelEdit = () => {

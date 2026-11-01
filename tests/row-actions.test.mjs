@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const PAGES_WITH_ROW_ACTIONS = ['teachers', 'classrooms', 'locations', 'cohorts', 'terms'];
+const PAGES_WITH_ROW_ACTIONS = ['teachers', 'classrooms', 'locations', 'cohorts', 'terms', 'courses'];
 
 for (const page of PAGES_WITH_ROW_ACTIONS) {
   const source = readFileSync(new URL(`../app/${page}/page.tsx`, import.meta.url), 'utf8');
@@ -28,5 +28,20 @@ for (const page of PAGES_WITH_ROW_ACTIONS) {
     for (const button of deleteButtons) {
       assert.doesNotMatch(button, /api\./, 'a Delete button calls the API without asking');
     }
+  });
+
+  test(`${page}: after Edit, Cancel and Save empty the form again`, () => {
+    // reset(values) also makes those values the form's starting values, so a later
+    // reset() (Cancel, Save) would bring the record back. Every reset with values in
+    // startEdit must keep the starting values.
+    const start = source.indexOf('const startEdit');
+    const startEdit = source.slice(start, source.indexOf('\n  };', start));
+    const resets = startEdit.match(/\breset\w*\(\{/g) ?? [];
+    const kept = startEdit.match(/\}, \{ keepDefaultValues: true \}\);/g) ?? [];
+    assert.ok(resets.length > 0, 'startEdit does not fill the form');
+    assert.equal(kept.length, resets.length, 'a reset in startEdit without { keepDefaultValues: true }');
+    // reset attaches the fields again on the next render; a focus call before that
+    // does nothing, so startEdit focuses inside setTimeout.
+    assert.doesNotMatch(startEdit, /^\s*(setFocus|focus\w+)\(/m, 'startEdit focuses before the form has rendered again');
   });
 }

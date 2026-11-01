@@ -108,8 +108,9 @@ export default function TeachersPage() {
       department: teacher.department,
       maxHoursPerWeek: teacher.maxHoursPerWeek,
       timePreference: teacher.timePreference,
-    });
-    setFocus('name');
+    }, { keepDefaultValues: true }); // Cancel and Save then empty the form again
+    // reset attaches the fields again on the next render; focus after that.
+    setTimeout(() => setFocus('name'), 0);
   };
 
   const cancelEdit = () => {

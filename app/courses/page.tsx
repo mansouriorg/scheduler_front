@@ -7,6 +7,8 @@ import { Notice, type NoticeMessage } from '@/components/notice';
 import { courseSchema, type CourseFormValues } from '@/lib/validations/course';
 import { StatusRow } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; 
 
 // The form rules (including credits) are in lib/validations/course.ts, with their tests.
@@ -19,6 +21,11 @@ export default function CoursesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // The course shown in the form for changes (null: the form adds a new course),
+  // and the course waiting in the "Delete?" window.
+  const [editing, setEditing] = useState<Course | null>(null);
+  const [toDelete, setToDelete] = useState<Course | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
@@ -26,6 +33,7 @@ export default function CoursesPage() {
     handleSubmit,
     reset,
     watch,
+    setFocus,
     formState: { errors },
   } = useForm<CourseFormValues>({
     resolver: zodResolver(courseSchema),
@@ -73,9 +81,14 @@ export default function CoursesPage() {
     setIsSubmitting(true);
     setNotice(null);
     try {
-      await api.createCourse(data); 
-
-      setNotice({ type: 'success', text: 'Course saved.' });
+      if (editing) {
+        await api.updateCourse(editing.id, data);
+        setNotice({ type: 'success', text: `${data.code} was updated.` });
+        setEditing(null);
+      } else {
+        await api.createCourse(data);
+        setNotice({ type: 'success', text: 'Course saved.' });
+      }
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
@@ -86,17 +99,79 @@ export default function CoursesPage() {
     }
   };
 
+  // Puts a course from the table into the form, to change it. Each part (lecture,
+  // TD, TP) becomes a row of the breakdown; only the fields the form has are kept.
+  const startEdit = (course: Course) => {
+    setEditing(course);
+    setNotice(null);
+    reset({
+      code: course.code,
+      title: course.title,
+      credits: course.credits,
+      totalHours: course.totalHours,
+      offeredInTerms: course.offeredInTerms,
+      componentsTemplate: course.componentsTemplate.map((part) => ({
+        type: part.type,
+        totalComponentHours: part.totalComponentHours,
+        hoursPerSession: part.hoursPerSession,
+        requiresRoomType: part.requiresRoomType,
+        requiredEquipment: part.requiredEquipment,
+      })),
+    }, { keepDefaultValues: true }); // Cancel and Save then empty the form again
+    // reset attaches the fields again on the next render; focus after that.
+    setTimeout(() => setFocus('code'), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    reset();
+  };
+
+  // Runs when "Delete" is confirmed in the window. The server refuses while the
+  // course has course offerings; its message (why, and what to do) is shown as it is.
+  const confirmDelete = async () => {
+    if (toDelete === null) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteCourse(toDelete.id);
+      setNotice({ type: 'success', text: `${toDelete.code} was deleted.` });
+      if (editing?.id === toDelete.id) cancelEdit();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not delete ${toDelete.code}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsDeleting(false);
+      setToDelete(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Master Course Catalog</h1>
         <Notice message={notice} onDismiss={setNotice} />
+        <ConfirmDialog
+          open={toDelete !== null}
+          title={`Delete ${toDelete?.code ?? 'this course'}?`}
+          message="This cannot be undone. A course with course offerings cannot be deleted; you will see a message instead."
+          confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+          busy={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           
           {/* LEFT COLUMN: THE WIZARD FORM */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">Add New Course Blueprint</h2>
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${editing.code}` : 'Add New Course Blueprint'}</h2>
+            {editing && (
+              <p className="-mt-4 mb-6 text-sm text-gray-600">
+                Changes to the breakdown apply to course offerings you create from now on.
+                Existing course offerings keep the classes they already have.
+              </p>
+            )}
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               
@@ -201,13 +276,24 @@ export default function CoursesPage() {
                 </button>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || allocatedHours !== watchTotalHours}
-                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting ? 'Saving...' : 'Save Course Blueprint'}
-              </button>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || allocatedHours !== watchTotalHours}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Save Course Blueprint'}
+                </button>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -226,23 +312,24 @@ export default function CoursesPage() {
                     <th className="p-4 font-medium">Hours</th>
                     <th className="p-4 font-medium">Credits</th>
                     <th className="p-4 font-medium">Breakdown</th>
+                    <th className="sticky right-0 bg-gray-50 p-4 font-medium text-right shadow-[inset_1px_0_0_#f3f4f6]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {isLoading ? (
-                    <StatusRow colSpan={5} message="Loading courses..." />
+                    <StatusRow colSpan={6} message="Loading courses..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={5}
+                      colSpan={6}
                       tone="error"
                       message={`Could not load the courses. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : courses.length === 0 ? (
-                    <tr><td colSpan={5} className="p-8 text-center text-gray-500">No courses defined yet.</td></tr>
+                    <tr><td colSpan={6} className="p-8 text-center text-gray-500">No courses defined yet.</td></tr>
                   ) : (
                     courses.map((course) => (
-                      <tr key={course.id} className="hover:bg-gray-50">
+                      <tr key={course.id} className={editing?.id === course.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}>
                         <td className="p-4 font-bold text-gray-900">{course.code}</td>
                         <td className="p-4 text-gray-700">{course.title}</td>
                         <td className="p-4 font-medium text-blue-600">{course.totalHours}h</td>
@@ -251,6 +338,29 @@ export default function CoursesPage() {
                           {course.componentsTemplate.map((comp, idx) => (
                             <div key={idx}>• {comp.type}: {comp.totalComponentHours}h</div>
                           ))}
+                        </td>
+                        {/* Stays in view when the table scrolls sideways, so Edit and Delete are always visible. */}
+                        <td className="sticky right-0 bg-inherit p-4 shadow-[inset_1px_0_0_#f3f4f6]">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(course)}
+                              aria-label={`Edit ${course.code}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setToDelete(course)}
+                              aria-label={`Delete ${course.code}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

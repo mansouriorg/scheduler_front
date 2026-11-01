@@ -128,8 +128,9 @@ export default function ClassroomsPage() {
       roomType: room.roomType,
       equipment: room.equipment,
       floorId: room.floorId,
-    });
-    setFocus('name');
+    }, { keepDefaultValues: true }); // Cancel and Save then empty the form again
+    // reset attaches the fields again on the next render; focus after that.
+    setTimeout(() => setFocus('name'), 0);
   };
 
   const cancelEdit = () => {

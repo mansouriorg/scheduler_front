@@ -25,6 +25,8 @@ export const api = {
   // --- COURSES ---
   getCourses: () => apiClient.get('/courses').then(res => res.data),
   createCourse: (data: any) => apiClient.post('/courses', data).then(res => res.data),
+  updateCourse: (id: string, data: unknown) => apiClient.patch(`/courses/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteCourse: (id: string) => apiClient.delete(`/courses/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- COHORTS & TERMS ---
   getCohorts: () => apiClient.get('/cohorts').then(res => res.data),

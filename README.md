@@ -43,7 +43,7 @@ Open http://localhost:3000.
 | `/locations`  | `app/locations/page.tsx`  | add, edit, move, delete and list campuses, buildings and floors |
 | `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
-| `/courses`    | `app/courses/page.tsx`    | add and list courses: credits, hours, lecture/TD/TP parts |
+| `/courses`    | `app/courses/page.tsx`    | add, edit, delete and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add, edit, delete and list student groups and their headcount |
 | `/terms`      | `app/terms/page.tsx`      | add, edit, delete and list academic terms and their dates |
 | `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term    |
@@ -66,6 +66,10 @@ Open http://localhost:3000.
   cohort that has course offerings or students, and the page shows its reason.
 - Terms can be edited and deleted from their table. brain_server refuses to delete a term
   that has course offerings, and the page shows its reason.
+- Courses can be edited and deleted from their table. A changed breakdown (lecture, TD,
+  TP) applies to course offerings created afterwards; existing offerings keep their
+  classes. brain_server refuses to delete a course that has course offerings, and the
+  page shows its reason.
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page (tested in `timetable.test.mjs`).

@@ -143,16 +143,18 @@ export default function LocationsPage() {
     setEditing(target);
     setNotice(null);
     if (target.kind === 'Campus') {
-      resetCampus({ name: target.record.name });
-      focusCampus('name');
+      // keepDefaultValues: Cancel and Save then empty the form again. reset attaches
+      // the fields again on the next render, so the focus waits for that.
+      resetCampus({ name: target.record.name }, { keepDefaultValues: true });
+      setTimeout(() => focusCampus('name'), 0);
     } else if (target.kind === 'Building') {
       const { name, code, campusId } = target.record;
-      resetBuilding({ name, code, campusId });
-      focusBuilding('name');
+      resetBuilding({ name, code, campusId }, { keepDefaultValues: true });
+      setTimeout(() => focusBuilding('name'), 0);
     } else {
       const { level, buildingId } = target.record;
-      resetFloor({ level, buildingId });
-      focusFloor('level');
+      resetFloor({ level, buildingId }, { keepDefaultValues: true });
+      setTimeout(() => focusFloor('level'), 0);
     }
   };
 
