@@ -30,9 +30,14 @@ type Offering = {
   cohortId: string;
   term: { name: string };
   course: { code: string; title: string };
-  cohort: { name: string };
+  cohort: { name: string; headcount: number };
   classes: OfferingClass[];
 };
+
+// The terms, courses and cohorts in the lists of the form.
+type TermOption = { id: string; name: string };
+type CourseOption = { id: string; code: string; title: string };
+type CohortOption = { id: string; name: string; headcount: number };
 
 // A teacher in the lists of the Teachers form.
 type Teacher = { id: string; name: string; department: string };
@@ -68,10 +73,10 @@ function deleteMessage(offering: Offering): string {
 }
 
 export default function CourseOfferingsPage() {
-  const [offerings, setOfferings] = useState<any[]>([]);
-  const [terms, setTerms] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [cohorts, setCohorts] = useState<any[]>([]);
+  const [offerings, setOfferings] = useState<Offering[]>([]);
+  const [terms, setTerms] = useState<TermOption[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [cohorts, setCohorts] = useState<CohortOption[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -479,7 +484,7 @@ export default function CourseOfferingsPage() {
                     <div>
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Generated Schedulable Blocks:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {offering.classes.map((cls: any) => (
+                        {offering.classes.map((cls) => (
                           <div key={cls.id} className="bg-orange-50 text-orange-800 border border-orange-200 rounded px-3 py-1.5 text-xs font-medium flex flex-wrap items-center shadow-sm">
                             <span className="font-bold mr-1">{cls.type}:</span> {cls.durationMinutes} mins 
                             <span className="ml-2 text-orange-700">({cls.requiresRoomType})</span>

@@ -8,6 +8,38 @@ export type ClassRoom = {
   floor: { level: string; building: { name: string; code: string } };
 } | null;
 
+// A course offering as GET /course-offerings sends it: the parts the home page
+// uses. The day and times of a class are null while it is not in the timetable.
+export type OfferingRow = {
+  termId: string;
+  course: { code: string; title: string };
+  cohort: { name: string };
+  classes?: {
+    id: string;
+    type: string;
+    dayOfWeek: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    assignedProfessorId: string | null;
+    room?: ClassRoom;
+  }[];
+};
+
+// A class on the timetable of the home page, with its names written out.
+export type TimetableClass = {
+  id: string;
+  termId: string;
+  courseCode: string;
+  courseTitle: string;
+  cohortName: string;
+  type: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string | null;
+  room: string;
+  teacher: string;
+};
+
 // Where a class takes place, for example "Lab 304, Science Hub (SCI) - Level 3"
 // (the building and floor are written as in the Classrooms page).
 export function roomLabel(room: ClassRoom | undefined): string {

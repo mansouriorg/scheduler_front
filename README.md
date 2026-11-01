@@ -87,6 +87,9 @@ Open http://localhost:3000.
   shows why) a time off that covers a class of the teacher already in the timetable.
   `lib/teacher-times.ts` lists, names and checks them (`teacher-times.test.mjs`).
 - `lib/api-error.ts` turns API errors into readable sentences.
+- `npm run lint` reports no problems. The data that brain_server sends is typed where the
+  pages read it (`lib/timetable.ts`, the types at the top of each page); request bodies are
+  `unknown` in `lib/api.ts`, because brain_server checks them. Write no `any`: lint refuses it.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page and names the room of
   each class with its building and floor, and its teacher (tested in `timetable.test.mjs`).

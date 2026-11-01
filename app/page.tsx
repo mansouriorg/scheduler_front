@@ -11,7 +11,9 @@ import {
   roomLabel,
   teacherLabel,
   termLabel,
+  type OfferingRow,
   type TermChoice,
+  type TimetableClass,
 } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
@@ -21,7 +23,7 @@ export default function Home() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [schedule, setSchedule] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<TimetableClass[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   
@@ -42,10 +44,10 @@ export default function Home() {
         api.getTerms(),
       ]);
       
-      const scheduledClasses: any[] = [];
+      const scheduledClasses: TimetableClass[] = [];
       
-      offerings.forEach((offering: any) => {
-        offering.classes?.forEach((cls: any) => {
+      offerings.forEach((offering: OfferingRow) => {
+        offering.classes?.forEach((cls) => {
           if (cls.startTime && cls.dayOfWeek) {
             scheduledClasses.push({
               id: cls.id,
