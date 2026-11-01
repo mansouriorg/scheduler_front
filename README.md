@@ -144,6 +144,11 @@ Open http://localhost:3000.
   in the order brain_server sends them again. The rules are in `lib/table-sort.ts`
   (`table-sort.test.mjs`), the heading and the list in `components/table-sort.tsx`, and
   `tests/table-sort.test.mjs` checks the pages.
+- Course Offerings, a list of cards, has the "Sort by" list only, always shown: by course
+  or cohort (A to Z), by term (by its start date), or by "Classes to place" (the classes
+  that are not in the timetable yet; highest first puts the offerings Generate still has
+  to place at the top). It works with the search box, and the line under the title says
+  the order.
 - After Generate, the home page shows a short summary ("12 classes were placed in the
   timetable of Fall 2026.") and, as a list under it, the notes from brain_server: the
   classes on Saturday, before their lecture, or outside the time their teacher prefers

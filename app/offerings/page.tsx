@@ -8,6 +8,8 @@ import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusBlock } from '@/components/status-message';
 import { NoMatchBlock, TableSearchBar } from '@/components/table-search';
 import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
+import { SortSelect } from '@/components/table-sort';
+import { sortRows, sortText, type Sort, type SortColumn } from '@/lib/table-sort';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
@@ -116,6 +118,8 @@ export default function CourseOfferingsPage() {
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
   // What is typed in the search box above the list (see lib/table-search.ts).
   const [search, setSearch] = useState('');
+  // The order chosen in the Sort by list (null: as brain_server sends the offerings).
+  const [sort, setSort] = useState<Sort>(null);
   // The offering shown in the form for changes (null: the form adds a new one),
   // and the offering waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Offering | null>(null);
@@ -363,15 +367,29 @@ export default function CourseOfferingsPage() {
     .filter((text): text is string => text !== null);
   const refusals = [...notFreeNow, ...overMaximum];
 
+  // The orders of the Sort by list (see lib/table-sort.ts). A term sorts by its start
+  // date; "Classes to place" counts the classes that are not in the timetable yet.
+  const sortColumns: SortColumn<Offering>[] = [
+    { key: 'course', label: 'Course', kind: 'text', value: (offering) => offering.course.code },
+    { key: 'cohort', label: 'Cohort', kind: 'text', value: (offering) => offering.cohort.name },
+    { key: 'term', label: 'Term', kind: 'date', value: (offering) => offering.term.startDate },
+    { key: 'toPlace', label: 'Classes to place', kind: 'number', value: (offering) => offering.classes.length - scheduledCount(offering) },
+  ];
+
   // The offerings that have what is typed in the search box, in their course, cohort, term
-  // or the teachers of their classes ("No teacher" finds the classes without one).
-  const shownOfferings = filterBySearch(offerings, search, (offering) => [
-    offering.course.code,
-    offering.course.title,
-    offering.cohort.name,
-    offering.term.name,
-    ...offering.classes.map((cls) => teacherName(cls.assignedProfessorId)),
-  ]);
+  // or the teachers of their classes ("No teacher" finds the classes without one), in
+  // the order chosen in the Sort by list.
+  const shownOfferings = sortRows(
+    filterBySearch(offerings, search, (offering) => [
+      offering.course.code,
+      offering.course.title,
+      offering.cohort.name,
+      offering.term.name,
+      ...offering.classes.map((cls) => teacherName(cls.assignedProfessorId)),
+    ]),
+    sortColumns,
+    sort,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -605,6 +623,14 @@ export default function CourseOfferingsPage() {
               value={search}
               onChange={setSearch}
               count={searchCount(shownOfferings.length, offerings.length, search, 'offering', 'offerings')}
+              sorted={sortText(sortColumns, sort)}
+            />
+            <SortSelect
+              id="sort-offerings"
+              columns={sortColumns}
+              sort={sort}
+              onSort={setSort}
+              className="flex items-center gap-3 border-b border-gray-100 px-6 py-3 [&>select]:max-w-sm"
             />
             
             <div className="p-6 space-y-4 max-h-[700px] overflow-y-auto">
