@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -16,10 +16,13 @@ type ConfirmDialogProps = {
 // An "are you sure?" window for actions that cannot be undone, such as deleting.
 // It uses the browser's <dialog> element: the rest of the page cannot be clicked
 // while it is open, keyboard focus stays inside, and Escape cancels.
-// Focus starts on Cancel, the safe choice.
+// Focus starts on Cancel, the safe choice. Each window has its own ids, so that
+// a page can have more than one.
 export function ConfirmDialog({ open, title, message, confirmLabel, busy = false, onConfirm, onCancel }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const messageId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -35,8 +38,8 @@ export function ConfirmDialog({ open, title, message, confirmLabel, busy = false
   return (
     <dialog
       ref={dialogRef}
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-message"
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
       onCancel={(event) => {
         // Escape: the page closes the dialog itself (through `open`), unless busy.
         event.preventDefault();
@@ -44,10 +47,10 @@ export function ConfirmDialog({ open, title, message, confirmLabel, busy = false
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-gray-200 bg-white p-6 text-left shadow-xl backdrop:bg-gray-900/50"
     >
-      <h2 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900">
+      <h2 id={titleId} className="text-lg font-semibold text-gray-900">
         {title}
       </h2>
-      <p id="confirm-dialog-message" className="mt-2 text-sm text-gray-600">
+      <p id={messageId} className="mt-2 text-sm text-gray-600">
         {message}
       </p>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

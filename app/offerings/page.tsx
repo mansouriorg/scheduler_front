@@ -9,7 +9,7 @@ import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
-import { GraduationCap, Pencil, Trash2 } from 'lucide-react';
+import { CalendarX, GraduationCap, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; // <-- Import your centralized API client
 import {
   classLabels,
@@ -92,6 +92,14 @@ function deleteMessage(offering: Offering): string {
   return parts.join(' ');
 }
 
+// What the "Unschedule?" window says: only the classes of this offering leave the
+// timetable; everything else stays.
+function unscheduleMessage(offering: Offering): string {
+  const scheduled = scheduledCount(offering);
+  const which = scheduled === 1 ? 'Its class in the timetable loses its' : `Its ${scheduled} classes in the timetable lose their`;
+  return `${which} room, day and time. Their teachers, the offering and the other classes of the timetable stay. Generate places ${scheduled === 1 ? 'it' : 'them'} again around the other classes.`;
+}
+
 export default function CourseOfferingsPage() {
   const [offerings, setOfferings] = useState<Offering[]>([]);
   const [terms, setTerms] = useState<TermOption[]>([]);
@@ -109,6 +117,10 @@ export default function CourseOfferingsPage() {
   const [editing, setEditing] = useState<Offering | null>(null);
   const [toDelete, setToDelete] = useState<Offering | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // The offering waiting in the "Unschedule?" window: its classes would leave the
+  // timetable, and only them.
+  const [toUnschedule, setToUnschedule] = useState<Offering | null>(null);
+  const [isUnscheduling, setIsUnscheduling] = useState(false);
   // The offering whose classes are shown in the Teachers form (null: none),
   // and the teacher chosen for each class ('' for no teacher).
   const [teaching, setTeaching] = useState<Offering | null>(null);
@@ -280,6 +292,26 @@ export default function CourseOfferingsPage() {
     }
   };
 
+  // Runs when "Unschedule" is confirmed in the window. The forms of that offering
+  // close: the times they show would be out of date.
+  const confirmUnschedule = async () => {
+    if (toUnschedule === null) return;
+    setIsUnscheduling(true);
+    try {
+      const result = await api.clearOfferingTimetable(toUnschedule.id);
+      setNotice({ type: 'success', text: result.message });
+      if (editing?.id === toUnschedule.id) cancelEdit();
+      if (teaching?.id === toUnschedule.id) setTeaching(null);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not unschedule ${offeringName(toUnschedule)}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsUnscheduling(false);
+      setToUnschedule(null);
+    }
+  };
+
   // "LECTURE", "TD 1", "TD 2": the names of the classes in the Teachers form.
   const teachingLabels = teaching ? classLabels(teaching.classes) : [];
 
@@ -340,6 +372,15 @@ export default function CourseOfferingsPage() {
           busy={isDeleting}
           onConfirm={confirmDelete}
           onCancel={() => setToDelete(null)}
+        />
+        <ConfirmDialog
+          open={toUnschedule !== null}
+          title={`Take ${toUnschedule === null ? 'this offering' : offeringName(toUnschedule)} out of the timetable?`}
+          message={toUnschedule === null ? '' : unscheduleMessage(toUnschedule)}
+          confirmLabel={isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
+          busy={isUnscheduling}
+          onConfirm={confirmUnschedule}
+          onCancel={() => setToUnschedule(null)}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -606,6 +647,17 @@ export default function CourseOfferingsPage() {
                           <GraduationCap className="h-4 w-4" aria-hidden="true" />
                           Teachers
                         </button>
+                        {scheduledCount(offering) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setToUnschedule(offering)}
+                            aria-label={`Unschedule ${offeringName(offering)}`}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                          >
+                            <CalendarX className="h-4 w-4" aria-hidden="true" />
+                            Unschedule
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => startEdit(offering)}

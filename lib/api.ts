@@ -63,6 +63,9 @@ export const api = {
   createOffering: (data: unknown) => apiClient.post('/course-offerings', data).then(res => res.data),
   updateOffering: (id: string, data: unknown) => apiClient.patch(`/course-offerings/${encodeURIComponent(id)}`, data).then(res => res.data),
   deleteOffering: (id: string) => apiClient.delete(`/course-offerings/${encodeURIComponent(id)}`).then(res => res.data),
+  // Takes only the classes of one offering out of the timetable (Generate places them again).
+  clearOfferingTimetable: (id: string) =>
+    apiClient.delete(`/course-offerings/${encodeURIComponent(id)}/timetable`).then(res => res.data),
   // Sets the teacher of some classes of an offering, all together or none.
   assignTeachers: (id: string, classes: { classId: string; professorId: string | null }[]) =>
     apiClient.patch(`/course-offerings/${encodeURIComponent(id)}/teachers`, { classes }).then(res => res.data),

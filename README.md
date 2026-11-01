@@ -76,6 +76,12 @@ Open http://localhost:3000.
   and a delete removes them with it (the "Delete?" window says how many). brain_server
   refuses to delete an offering with enrolled students, and to move it to a term where a
   teacher of its classes would teach too many hours a week; the page shows its reason.
+- "Unschedule" on a course offering (shown while some of its classes are in the
+  timetable) takes only those classes out of the timetable, after asking first; their
+  teachers, the offering and the other classes stay, and Generate places them again
+  around the others (`DELETE /course-offerings/:id/timetable` in brain_server). Each
+  confirmation window has its own ids (`useId` in `components/confirm-dialog.tsx`), so a
+  page can have two. `tests/clear-timetable.test.mjs` checks the button and the window.
 - Each class of a course offering can have its own teacher ("Teachers" on an offering).
   Classes keep their day and time. brain_server saves all changes or none, and refuses
   (the page shows why) a teacher who would teach too many hours a week, or who is busy or
