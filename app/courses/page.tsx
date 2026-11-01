@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { courseSchema, type CourseFormValues } from '@/lib/validations/course';
 import { StatusRow } from '@/components/status-message';
+import { TABLE_CARDS } from '@/lib/table-cards';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -13,6 +14,10 @@ import { api } from '@/lib/api';
 
 // The form rules (including credits) are in lib/validations/course.ts, with their tests.
 type Course = CourseFormValues & { id: string };
+
+// Where the box of the table is narrower than 48rem, each course is shown as a
+// card (see lib/table-cards.ts).
+const cards = TABLE_CARDS['3xl'];
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -303,9 +308,9 @@ export default function CoursesPage() {
               <h2 className="text-xl font-semibold text-gray-800">Existing Courses</h2>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
+            <div className="@container overflow-x-auto">
+              <table className={`w-full text-left border-collapse ${cards.table}`}>
+                <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <th className="p-4 font-medium">Code</th>
                     <th className="p-4 font-medium">Title</th>
@@ -315,7 +320,7 @@ export default function CoursesPage() {
                     <th className="sticky right-0 bg-gray-50 p-4 font-medium text-right shadow-[inset_1px_0_0_#f3f4f6]">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
                     <StatusRow colSpan={6} message="Loading courses..." />
                   ) : loadError ? (
@@ -329,19 +334,31 @@ export default function CoursesPage() {
                     <tr><td colSpan={6} className="p-8 text-center text-gray-500">No courses defined yet.</td></tr>
                   ) : (
                     courses.map((course) => (
-                      <tr key={course.id} className={editing?.id === course.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}>
-                        <td className="p-4 font-bold text-gray-900">{course.code}</td>
-                        <td className="p-4 text-gray-700">{course.title}</td>
-                        <td className="p-4 font-medium text-blue-600">{course.totalHours}h</td>
-                        <td className="p-4 text-gray-700">{course.credits}</td>
-                        <td className="p-4 text-gray-500 text-xs space-y-1">
-                          {course.componentsTemplate.map((comp, idx) => (
-                            <div key={idx}>• {comp.type}: {comp.totalComponentHours}h</div>
-                          ))}
+                      <tr key={course.id} className={`${cards.row} ${editing?.id === course.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}>
+                        <td className={`${cards.title} font-bold text-gray-900`}>{course.code}</td>
+                        <td className={`${cards.cell} text-gray-700`}>
+                          <span className={cards.label}>Title</span>
+                          <span>{course.title}</span>
                         </td>
-                        {/* Stays in view when the table scrolls sideways, so Edit and Delete are always visible. */}
-                        <td className="sticky right-0 bg-inherit p-4 shadow-[inset_1px_0_0_#f3f4f6]">
-                          <div className="flex justify-end gap-1">
+                        <td className={`${cards.cell} font-medium text-blue-600`}>
+                          <span className={cards.label}>Hours</span>
+                          <span>{course.totalHours}h</span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-700`}>
+                          <span className={cards.label}>Credits</span>
+                          <span>{course.credits}</span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-500 text-xs`}>
+                          <span className={cards.label}>Breakdown</span>
+                          <div className="space-y-1">
+                            {course.componentsTemplate.map((comp, idx) => (
+                              <div key={idx}>• {comp.type}: {comp.totalComponentHours}h</div>
+                            ))}
+                          </div>
+                        </td>
+                        {/* In the table it stays in view when the table scrolls sideways, so Edit and Delete are always visible. */}
+                        <td className={`${cards.actions} bg-inherit @3xl:sticky @3xl:right-0 @3xl:shadow-[inset_1px_0_0_#f3f4f6]`}>
+                          <div className={cards.buttons}>
                             <button
                               type="button"
                               onClick={() => startEdit(course)}

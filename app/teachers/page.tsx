@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
+import { TABLE_CARDS } from '@/lib/table-cards';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Clock, Pencil, Trash2 } from 'lucide-react';
@@ -39,6 +40,10 @@ type Teacher = TeacherFormValues & { id: string; unavailability?: TimeOff[] };
 // The look of the lists in the Times off form.
 const TIME_OFF_FIELD =
   'w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm focus:border-blue-600 sm:text-sm';
+
+// Where the box of the table is narrower than 42rem, each teacher is shown as a
+// card (see lib/table-cards.ts).
+const cards = TABLE_CARDS['2xl'];
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -413,9 +418,9 @@ export default function TeachersPage() {
               <h2 className="text-xl font-semibold text-gray-800">Current Teachers</h2>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
+            <div className="@container overflow-x-auto">
+              <table className={`w-full text-left border-collapse ${cards.table}`}>
+                <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <th className="p-4 font-medium">Name</th>
                     <th className="p-4 font-medium">Department</th>
@@ -424,7 +429,7 @@ export default function TeachersPage() {
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
                     <StatusRow colSpan={5} message="Loading teachers..." />
                   ) : loadError ? (
@@ -442,37 +447,46 @@ export default function TeachersPage() {
                     </tr>
                   ) : (
                     teachers.map((teacher) => (
-                      <tr key={teacher.id} className={editing?.id === teacher.id || timesOffOf?.id === teacher.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
-                        <td className="p-4 font-medium text-gray-900">{teacher.name}</td>
-                        <td className="p-4 text-gray-600">{teacher.department}</td>
-                        <td className="p-4 text-gray-600">{teacher.maxHoursPerWeek} hrs</td>
-                        <td className="p-4">
-                          <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
-                            {teacher.timePreference.replace('_', ' ')}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => startTimesOff(teacher)}
-                            aria-label={`Times off of ${teacher.name}`}
-                            className="-ml-1 mt-2 flex items-center gap-1 rounded-md px-1 py-0.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
-                          >
-                            <Clock className="h-4 w-4" aria-hidden="true" />
-                            Times off
-                          </button>
-                          {(teacher.unavailability ?? []).length === 0 ? (
-                            <p className="text-sm text-gray-500">None</p>
-                          ) : (
-                            <ul className="space-y-0.5 text-sm text-gray-600">
-                              {sortTimesOff(teacher.unavailability ?? []).map((time) => (
-                                <li key={`${time.dayOfWeek}-${time.startTime}`} className="whitespace-nowrap">
-                                  {timeOffLabel(time)}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
+                      <tr key={teacher.id} className={`${cards.row} ${editing?.id === teacher.id || timesOffOf?.id === teacher.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
+                        <td className={`${cards.title} font-medium text-gray-900`}>{teacher.name}</td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Department</span>
+                          <span>{teacher.department}</span>
                         </td>
-                        <td className="p-4">
-                          <div className="flex justify-end gap-1">
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Max Hours</span>
+                          <span>{teacher.maxHoursPerWeek} hrs</span>
+                        </td>
+                        <td className={cards.cell}>
+                          <span className={cards.label}>Availability</span>
+                          <div>
+                            <span className="inline-block whitespace-nowrap px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+                              {teacher.timePreference.replace('_', ' ')}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startTimesOff(teacher)}
+                              aria-label={`Times off of ${teacher.name}`}
+                              className="-ml-1 mt-2 flex items-center gap-1 rounded-md px-1 py-0.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Clock className="h-4 w-4" aria-hidden="true" />
+                              Times off
+                            </button>
+                            {(teacher.unavailability ?? []).length === 0 ? (
+                              <p className="text-sm text-gray-500">None</p>
+                            ) : (
+                              <ul className="space-y-0.5 text-sm text-gray-600">
+                                {sortTimesOff(teacher.unavailability ?? []).map((time) => (
+                                  <li key={`${time.dayOfWeek}-${time.startTime}`} className="whitespace-nowrap">
+                                    {timeOffLabel(time)}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </td>
+                        <td className={cards.actions}>
+                          <div className={cards.buttons}>
                             <button
                               type="button"
                               onClick={() => startEdit(teacher)}

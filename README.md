@@ -89,6 +89,11 @@ Open http://localhost:3000.
 - The "Time Preference" of a teacher (Morning 08:00 - 12:00, Afternoon 13:00 - 17:00,
   Evening 17:00 - 18:30) is a wish, not a rule: Generate puts their classes at that time
   when it can, and its message says how many are, and names the classes that are not.
+- The data tables (Classrooms, Cohorts, Courses, Teachers, Terms) show each row as a card
+  where the box of the table is too narrow for it: on phones, and next to the form on
+  smaller laptops. Each value then has its column name in front of it. The class names are
+  in `lib/table-cards.ts` (`table-cards.test.mjs`; `tests/table-cards.test.mjs` checks the
+  pages).
 - `lib/api-error.ts` turns API errors into readable sentences.
 - `npm run lint` reports no problems. The data that brain_server sends is typed where the
   pages read it (`lib/timetable.ts`, the types at the top of each page); request bodies are

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
+import { TABLE_CARDS } from '@/lib/table-cards';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -27,6 +28,10 @@ const termSchema = z.object({
 
 type TermFormValues = z.infer<typeof termSchema>;
 type Term = TermFormValues & { id: string };
+
+// Where the box of the table is narrower than 36rem, each term is shown as a
+// card (see lib/table-cards.ts).
+const cards = TABLE_CARDS['xl'];
 
 export default function TermsPage() {
   const [terms, setTerms] = useState<Term[]>([]);
@@ -259,9 +264,9 @@ export default function TermsPage() {
               <h2 className="text-xl font-semibold text-gray-800">Term Schedule</h2>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
+            <div className="@container overflow-x-auto">
+              <table className={`w-full text-left border-collapse ${cards.table}`}>
+                <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <th className="p-4 font-medium">Term Name</th>
                     <th className="p-4 font-medium">Type</th>
@@ -270,7 +275,7 @@ export default function TermsPage() {
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
                     <StatusRow colSpan={5} message="Loading terms..." />
                   ) : loadError ? (
@@ -288,17 +293,26 @@ export default function TermsPage() {
                     </tr>
                   ) : (
                     terms.map((term) => (
-                      <tr key={term.id} className={editing?.id === term.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
-                        <td className="p-4 font-bold text-gray-900">{term.name}</td>
-                        <td className="p-4 text-gray-600">
-                           <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700">
-                             {term.type.replace('_', ' ')}
-                           </span>
+                      <tr key={term.id} className={`${cards.row} ${editing?.id === term.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
+                        <td className={`${cards.title} font-bold text-gray-900`}>{term.name}</td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Type</span>
+                          <span>
+                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700">
+                              {term.type.replace('_', ' ')}
+                            </span>
+                          </span>
                         </td>
-                        <td className="p-4 text-gray-600">{formatDate(term.startDate)}</td>
-                        <td className="p-4 text-gray-600">{formatDate(term.endDate)}</td>
-                        <td className="p-4">
-                          <div className="flex justify-end gap-1">
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Start Date</span>
+                          <span>{formatDate(term.startDate)}</span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>End Date</span>
+                          <span>{formatDate(term.endDate)}</span>
+                        </td>
+                        <td className={cards.actions}>
+                          <div className={cards.buttons}>
                             <button
                               type="button"
                               onClick={() => startEdit(term)}

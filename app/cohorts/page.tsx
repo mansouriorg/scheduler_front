@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
+import { TABLE_CARDS } from '@/lib/table-cards';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -20,6 +21,10 @@ const cohortSchema = z.object({
 
 type CohortFormValues = z.infer<typeof cohortSchema>;
 type Cohort = CohortFormValues & { id: string };
+
+// Where the box of the table is narrower than 36rem, each cohort is shown as a
+// card (see lib/table-cards.ts).
+const cards = TABLE_CARDS['xl'];
 
 export default function CohortsPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
@@ -231,9 +236,9 @@ export default function CohortsPage() {
               </span>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
+            <div className="@container overflow-x-auto">
+              <table className={`w-full text-left border-collapse ${cards.table}`}>
+                <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <th className="p-4 font-medium">Cohort Name</th>
                     <th className="p-4 font-medium">Headcount</th>
@@ -241,7 +246,7 @@ export default function CohortsPage() {
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
                     <StatusRow colSpan={4} message="Loading cohorts..." />
                   ) : loadError ? (
@@ -259,18 +264,22 @@ export default function CohortsPage() {
                     </tr>
                   ) : (
                     cohorts.map((cohort) => (
-                      <tr key={cohort.id} className={editing?.id === cohort.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
-                        <td className="p-4 font-medium text-gray-900">{cohort.name}</td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {cohort.headcount} Students
+                      <tr key={cohort.id} className={`${cards.row} ${editing?.id === cohort.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
+                        <td className={`${cards.title} font-medium text-gray-900`}>{cohort.name}</td>
+                        <td className={cards.cell}>
+                          <span className={cards.label}>Headcount</span>
+                          <span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              {cohort.headcount} Students
+                            </span>
                           </span>
                         </td>
-                        <td className="p-4 text-gray-600">
-                          {cohort.currentSemester.replace('_', ' ')}
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Current Term</span>
+                          <span>{cohort.currentSemester.replace('_', ' ')}</span>
                         </td>
-                        <td className="p-4">
-                          <div className="flex justify-end gap-1">
+                        <td className={cards.actions}>
+                          <div className={cards.buttons}>
                             <button
                               type="button"
                               onClick={() => startEdit(cohort)}

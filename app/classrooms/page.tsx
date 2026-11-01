@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
+import { TABLE_CARDS } from '@/lib/table-cards';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -36,6 +37,10 @@ const EQUIPMENT_OPTIONS = [
   { value: 'WHITEBOARD', label: 'Whiteboard' },
   { value: 'SMARTBOARD', label: 'Smartboard' },
 ];
+
+// Where the box of the table is narrower than 48rem, each room is shown as a
+// card (see lib/table-cards.ts).
+const cards = TABLE_CARDS['3xl'];
 
 export default function ClassroomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -295,9 +300,9 @@ export default function ClassroomsPage() {
               <h2 className="text-xl font-semibold text-gray-800">Available Rooms & Labs</h2>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
+            <div className="@container overflow-x-auto">
+              <table className={`w-full text-left border-collapse ${cards.table}`}>
+                <thead className={cards.head}>
                   <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
                     <th className="p-4 font-medium">Name</th>
                     <th className="p-4 font-medium">Type</th>
@@ -307,7 +312,7 @@ export default function ClassroomsPage() {
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
                     <StatusRow colSpan={6} message="Loading rooms..." />
                   ) : loadError ? (
@@ -325,16 +330,26 @@ export default function ClassroomsPage() {
                     </tr>
                   ) : (
                     rooms.map((room) => (
-                      <tr key={room.id} className={editing?.id === room.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
-                        <td className="p-4 font-medium text-gray-900">{room.name}</td>
-                        <td className="p-4 text-gray-600">
-                          <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-purple-50 text-purple-700">
-                            {room.roomType.replace('_', ' ')}
+                      <tr key={room.id} className={`${cards.row} ${editing?.id === room.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
+                        <td className={`${cards.title} font-medium text-gray-900`}>{room.name}</td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Type</span>
+                          <span>
+                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-purple-50 text-purple-700">
+                              {room.roomType.replace('_', ' ')}
+                            </span>
                           </span>
                         </td>
-                        <td className="p-4 text-gray-600">{room.capacity} seats</td>
-                        <td className="p-4 text-gray-600">{findFloorLabel(floorOptions, room.floorId)}</td>
-                        <td className="p-4">
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Capacity</span>
+                          <span>{room.capacity} seats</span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Location</span>
+                          <span>{findFloorLabel(floorOptions, room.floorId)}</span>
+                        </td>
+                        <td className={cards.cell}>
+                          <span className={cards.label}>Equipment</span>
                           <div className="flex flex-wrap gap-1">
                             {room.equipment.map((eq) => (
                               <span key={eq} className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600">
@@ -344,8 +359,8 @@ export default function ClassroomsPage() {
                             {room.equipment.length === 0 && <span className="text-gray-500 italic">None</span>}
                           </div>
                         </td>
-                        <td className="p-4">
-                          <div className="flex justify-end gap-1">
+                        <td className={cards.actions}>
+                          <div className={cards.buttons}>
                             <button
                               type="button"
                               onClick={() => startEdit(room)}
