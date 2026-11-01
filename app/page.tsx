@@ -13,10 +13,14 @@ import {
   roomLabel,
   teacherLabel,
   termLabel,
+  unplacedClasses,
+  unplacedLabel,
+  unplacedSummary,
   viewChoices,
   type OfferingRow,
   type TermChoice,
   type TimetableClass,
+  type UnplacedClass,
 } from '@/lib/timetable';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { generateNotice } from '@/lib/generate-result';
@@ -29,6 +33,8 @@ export default function Home() {
   // The feedback above the timetable; notes are shown as a list under the text.
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info'; notes?: string[] } | null>(null);
   const [schedule, setSchedule] = useState<TimetableClass[]>([]);
+  // The classes that are not in the timetable yet (of every term).
+  const [unplaced, setUnplaced] = useState<UnplacedClass[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   
@@ -77,6 +83,7 @@ export default function Home() {
       // Sort by start time
       scheduledClasses.sort((a, b) => a.startTime.localeCompare(b.startTime));
       setSchedule(scheduledClasses);
+      setUnplaced(unplacedClasses(offerings, teachers));
       setLoadError(null);
 
       // Keep the chosen term while it exists; otherwise start with the term
@@ -153,6 +160,9 @@ export default function Home() {
 
   // Number of class blocks shown in the chosen view, on all days.
   const visibleCount = countClassesInView(termSchedule, view);
+
+  // The classes of the chosen term, in the chosen view, that Generate still has to place.
+  const termUnplaced = unplaced.filter((cls) => cls.termId === selectedTermId && inView(cls, view));
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8">
@@ -293,6 +303,21 @@ export default function Home() {
               </ul>
             )}
           </div>
+        )}
+
+        {/* The classes not in the timetable yet: open the list to see them. */}
+        {isLoadingSchedule === false && loadError === null && termUnplaced.length > 0 && (
+          <details className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <summary className="cursor-pointer font-semibold">
+              {unplacedSummary(termUnplaced.length, shown ? shown.label : termName)}
+            </summary>
+            <p className="mt-2">Auto-Generate places them around the classes already in the timetable.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {termUnplaced.map((cls) => (
+                <li key={cls.id}>{unplacedLabel(cls)}</li>
+              ))}
+            </ul>
+          </details>
         )}
 
         {/* THE SCHEDULE GRID */}

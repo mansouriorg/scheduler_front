@@ -137,6 +137,9 @@ Open http://localhost:3000.
   cohort, one teacher or one room (the cohorts, teachers and rooms of that term's
   timetable, by name). Another term, or Clear, shows every class again.
   `viewChoices` and `inView` in `lib/timetable.ts` make the list and choose the classes.
+- Above the timetable, a list that opens on click says how many classes of the term (in
+  the chosen view) are not in the timetable yet, and names each one with its length and
+  teacher; Generate places them. `unplacedClasses` in `lib/timetable.ts` finds them.
 - The home page works on one term at a time: it shows the timetable of the chosen term,
   Generate places only that term's classes, and "Clear timetable" takes the room, day and
   time off that term's classes after asking first (other terms stay); Generate then places

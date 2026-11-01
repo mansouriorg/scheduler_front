@@ -15,6 +15,7 @@ export type OfferingRow = {
   classes?: {
     id: string;
     type: string;
+    durationMinutes: number;
     dayOfWeek: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -132,4 +133,56 @@ export function inView(cls: ViewClass, view: string): boolean {
 // How many class blocks the view shows, on all days.
 export function countClassesInView(classes: ViewClass[], view: string): number {
   return classes.filter((cls) => inView(cls, view)).length;
+}
+
+// A class of a term that is not in the timetable yet: Generate still has to place
+// it. It has no room, so it is in no room's week.
+export type UnplacedClass = ViewClass & {
+  id: string;
+  termId: string;
+  courseCode: string;
+  type: string;
+  durationMinutes: number;
+};
+
+// The classes of the offerings that have no day or time yet, sorted by course,
+// cohort and kind of class.
+export function unplacedClasses(offerings: OfferingRow[], teachers: { id: string; name: string }[]): UnplacedClass[] {
+  const unplaced: UnplacedClass[] = [];
+  for (const offering of offerings) {
+    for (const cls of offering.classes ?? []) {
+      if (cls.dayOfWeek !== null && cls.startTime !== null) continue;
+      unplaced.push({
+        id: cls.id,
+        termId: offering.termId,
+        courseCode: offering.course.code,
+        cohortName: offering.cohort.name,
+        type: cls.type,
+        durationMinutes: cls.durationMinutes,
+        teacher: teacherLabel(cls.assignedProfessorId, teachers),
+        teacherId: cls.assignedProfessorId,
+        room: 'No room yet',
+        roomId: null,
+      });
+    }
+  }
+  return unplaced.sort(
+    (a, b) =>
+      a.courseCode.localeCompare(b.courseCode) ||
+      a.cohortName.localeCompare(b.cohortName) ||
+      a.type.localeCompare(b.type),
+  );
+}
+
+// "3 classes of Fall 2026 are not in the timetable yet" (of: the term, or the
+// cohort or teacher of the View list).
+export function unplacedSummary(count: number, of: string): string {
+  return count === 1
+    ? `1 class of ${of} is not in the timetable yet`
+    : `${count} classes of ${of} are not in the timetable yet`;
+}
+
+// "DEV-101 TD for SE - Year 1: 120 mins, Dr. Amal Ben Salah" (or "No teacher yet").
+export function unplacedLabel(cls: UnplacedClass): string {
+  return `${cls.courseCode} ${cls.type} for ${cls.cohortName}: ${cls.durationMinutes} mins, ${cls.teacher}`;
 }
