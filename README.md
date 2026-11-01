@@ -144,6 +144,15 @@ Open http://localhost:3000.
   in the order brain_server sends them again. The rules are in `lib/table-sort.ts`
   (`table-sort.test.mjs`), the heading and the list in `components/table-sort.tsx`, and
   `tests/table-sort.test.mjs` checks the pages.
+- The Classrooms table has a "Weekly Use" column: how many hours a week each room is used
+  in the timetable of the term going on today (else the next term, else the latest one),
+  out of the 63 hours of the timetable week (Monday to Saturday, 08:00 to 18:30, as
+  scheduler-brain builds it), for example "9 of 63 hrs". Only that term's classes with a
+  room and a time count. "Not used" and "nearly full" (from 80%) stand out, the term is
+  said next to the title, and the column sorts like the others. It loads apart from the
+  rooms: if the timetable cannot load, the rooms still show and the column says "Not
+  known". `lib/room-use.ts` (`room-use.test.mjs`; `tests/room-use.test.mjs` checks the
+  page).
 - Course Offerings, a list of cards, has the "Sort by" list only, always shown: by course
   or cohort (A to Z), by term (by its start date), or by "Classes to place" (the classes
   that are not in the timetable yet; highest first puts the offerings Generate still has

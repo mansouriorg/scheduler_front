@@ -16,6 +16,8 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { buildFloorOptions, findFloorLabel, type FloorOption } from '@/lib/floor-options';
+import { defaultTermId, localDay, type TermChoice } from '@/lib/timetable';
+import { isNearlyFull, roomUse, roomUseText, type RoomUse, type RoomUseOffering } from '@/lib/room-use';
 import { api } from '@/lib/api'; 
 
 // 1. Zod Validation Schema (Cleaned up for strict TypeScript matching)
@@ -58,6 +60,9 @@ export default function ClassroomsPage() {
   const [search, setSearch] = useState('');
   // The column the table is sorted by, and which way (null: as brain_server sends it).
   const [sort, setSort] = useState<Sort>(null);
+  // How long each room is used each week in the timetable of one term (see
+  // lib/room-use.ts); null until it is loaded, or when it could not be loaded.
+  const [weeklyUse, setWeeklyUse] = useState<RoomUse | null>(null);
   // The room shown in the form for changes (null: the form adds a new room),
   // and the room waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Room | null>(null);
@@ -100,6 +105,27 @@ export default function ClassroomsPage() {
       }
     };
     fetchRooms();
+  }, [refreshTrigger]);
+
+  // The weekly use of each room in the term going on today (else the next term, else the
+  // latest one). It loads apart from the rooms, so that the table does not wait for it;
+  // if it cannot load, only the Weekly Use column says "Not known".
+  useEffect(() => {
+    const fetchWeeklyUse = async () => {
+      try {
+        const [offerings, terms]: [RoomUseOffering[], TermChoice[]] = await Promise.all([
+          api.getOfferings(),
+          api.getTerms(),
+        ]);
+        const termId = defaultTermId(terms, localDay(new Date()));
+        const term = terms.find((candidate) => candidate.id === termId);
+        setWeeklyUse(term ? roomUse(offerings, term.id, term.name) : { termName: '', minutes: {} });
+      } catch (error) {
+        console.error('Failed to fetch the weekly use of the rooms', error);
+        setWeeklyUse(null);
+      }
+    };
+    fetchWeeklyUse();
   }, [refreshTrigger]);
 
   const retryLoad = () => {
@@ -170,11 +196,15 @@ export default function ClassroomsPage() {
     }
   };
 
+  // The minutes a week the room is used in the timetable (0 while not known).
+  const minutesUsed = (room: Room) => weeklyUse?.minutes[room.id] ?? 0;
+
   // The columns the table can be sorted by (see lib/table-sort.ts).
   const sortColumns: SortColumn<Room>[] = [
     { key: 'name', label: 'Name', kind: 'text', value: (room) => room.name },
     { key: 'type', label: 'Type', kind: 'text', value: (room) => room.roomType.replace('_', ' ') },
     { key: 'capacity', label: 'Capacity', kind: 'number', value: (room) => room.capacity },
+    { key: 'use', label: 'Weekly Use', kind: 'number', value: (room) => minutesUsed(room) },
     { key: 'location', label: 'Location', kind: 'text', value: (room) => findFloorLabel(floorOptions, room.floorId) },
   ];
 
@@ -330,11 +360,18 @@ export default function ClassroomsPage() {
               title="Available Rooms & Labs"
               inputId="search-rooms"
               label="Search rooms"
-              placeholder="Name, type, building or equipment"
+              placeholder="Name, type, building, equipment"
               value={search}
               onChange={setSearch}
               count={searchCount(shownRooms.length, rooms.length, search, 'room', 'rooms')}
               sorted={sortText(sortColumns, sort)}
+              badge={
+                weeklyUse && weeklyUse.termName ? (
+                  <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                    Weekly use in {weeklyUse.termName}
+                  </span>
+                ) : undefined
+              }
             />
             
             <div className="@container overflow-x-auto">
@@ -345,6 +382,7 @@ export default function ClassroomsPage() {
                     <SortHeader columns={sortColumns} columnKey="name" sort={sort} onSort={setSort} />
                     <SortHeader columns={sortColumns} columnKey="type" sort={sort} onSort={setSort} />
                     <SortHeader columns={sortColumns} columnKey="capacity" sort={sort} onSort={setSort} />
+                    <SortHeader columns={sortColumns} columnKey="use" sort={sort} onSort={setSort} />
                     <SortHeader columns={sortColumns} columnKey="location" sort={sort} onSort={setSort} />
                     <th className="p-4 font-medium">Equipment</th>
                     <th className="p-4 font-medium text-right">Actions</th>
@@ -352,22 +390,22 @@ export default function ClassroomsPage() {
                 </thead>
                 <tbody className={`divide-y divide-gray-100 text-sm ${cards.body}`}>
                   {isLoading ? (
-                    <StatusRow colSpan={6} message="Loading rooms..." />
+                    <StatusRow colSpan={7} message="Loading rooms..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={6}
+                      colSpan={7}
                       tone="error"
                       message={`Could not load the rooms. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : rooms.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-500">
+                      <td colSpan={7} className="p-8 text-center text-gray-500">
                         No rooms found. Add one to see them here!
                       </td>
                     </tr>
                   ) : shownRooms.length === 0 ? (
-                    <NoMatchRow colSpan={6} text={noMatchText(search, 'room')} inputId="search-rooms" onClear={() => setSearch('')} />
+                    <NoMatchRow colSpan={7} text={noMatchText(search, 'room')} inputId="search-rooms" onClear={() => setSearch('')} />
                   ) : (
                     shownRooms.map((room) => (
                       <tr key={room.id} className={`${cards.row} ${editing?.id === room.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
@@ -383,6 +421,25 @@ export default function ClassroomsPage() {
                         <td className={`${cards.cell} text-gray-600`}>
                           <span className={cards.label}>Capacity</span>
                           <span>{room.capacity} seats</span>
+                        </td>
+                        <td className={`${cards.cell} text-gray-600`}>
+                          <span className={cards.label}>Weekly Use</span>
+                          {weeklyUse === null ? (
+                            <span className="text-gray-500">Not known</span>
+                          ) : (
+                            <span
+                              className={
+                                isNearlyFull(minutesUsed(room))
+                                  ? 'font-medium text-amber-800'
+                                  : minutesUsed(room) === 0
+                                    ? 'text-gray-500'
+                                    : undefined
+                              }
+                            >
+                              <span className="whitespace-nowrap">{roomUseText(minutesUsed(room))}</span>
+                              {isNearlyFull(minutesUsed(room)) && <span className="block text-xs">nearly full</span>}
+                            </span>
+                          )}
                         </td>
                         <td className={`${cards.cell} text-gray-600`}>
                           <span className={cards.label}>Location</span>

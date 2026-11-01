@@ -12,7 +12,7 @@ const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf
 // page, the list of rows, the Sort by list, the columns that can be sorted
 const PAGES = [
   ['teachers', 'teachers', 'sort-teachers', ['name', 'department', 'maxHours']],
-  ['classrooms', 'rooms', 'sort-rooms', ['name', 'type', 'capacity', 'location']],
+  ['classrooms', 'rooms', 'sort-rooms', ['name', 'type', 'capacity', 'use', 'location']],
   ['cohorts', 'cohorts', 'sort-cohorts', ['name', 'headcount', 'term']],
   ['courses', 'courses', 'sort-courses', ['code', 'title', 'hours', 'credits']],
   ['terms', 'terms', 'sort-terms', ['name', 'type', 'start', 'end']],
