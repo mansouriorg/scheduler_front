@@ -29,6 +29,8 @@ export const api = {
   // --- COHORTS & TERMS ---
   getCohorts: () => apiClient.get('/cohorts').then(res => res.data),
   createCohort: (data: any) => apiClient.post('/cohorts', data).then(res => res.data),
+  updateCohort: (id: string, data: unknown) => apiClient.patch(`/cohorts/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteCohort: (id: string) => apiClient.delete(`/cohorts/${encodeURIComponent(id)}`).then(res => res.data),
   
   getTerms: () => apiClient.get('/terms').then(res => res.data),
   createTerm: (data: any) => apiClient.post('/terms', data).then(res => res.data),

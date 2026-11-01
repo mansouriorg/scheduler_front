@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; 
 
 // 1. Zod Validation Schema (Cleaned up for strict TypeScript matching)
@@ -26,11 +28,17 @@ export default function CohortsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // The cohort shown in the form for changes (null: the form adds a new cohort),
+  // and the cohort waiting in the "Delete?" window.
+  const [editing, setEditing] = useState<Cohort | null>(null);
+  const [toDelete, setToDelete] = useState<Cohort | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors },
   } = useForm<CohortFormValues>({
     resolver: zodResolver(cohortSchema),
@@ -67,9 +75,14 @@ export default function CohortsPage() {
     setIsSubmitting(true);
     setNotice(null);
     try {
-      await api.createCohort(data); 
-
-      setNotice({ type: 'success', text: 'Cohort saved.' });
+      if (editing) {
+        await api.updateCohort(editing.id, data);
+        setNotice({ type: 'success', text: `${data.name} was updated.` });
+        setEditing(null);
+      } else {
+        await api.createCohort(data);
+        setNotice({ type: 'success', text: 'Cohort saved.' });
+      }
       reset();
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
@@ -80,17 +93,63 @@ export default function CohortsPage() {
     }
   };
 
+  // Puts a cohort from the table into the form, to change it.
+  const startEdit = (cohort: Cohort) => {
+    setEditing(cohort);
+    setNotice(null);
+    reset({
+      name: cohort.name,
+      headcount: cohort.headcount,
+      currentSemester: cohort.currentSemester,
+    });
+    setFocus('name');
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    reset();
+  };
+
+  // Runs when "Delete" is confirmed in the window. The server refuses while the
+  // cohort has course offerings or students; its message (why, and what to do)
+  // is shown as it is.
+  const confirmDelete = async () => {
+    if (toDelete === null) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteCohort(toDelete.id);
+      setNotice({ type: 'success', text: `${toDelete.name} was deleted.` });
+      if (editing?.id === toDelete.id) cancelEdit();
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not delete ${toDelete.name}. ${getErrorMessage(error)}` });
+    } finally {
+      setIsDeleting(false);
+      setToDelete(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="mb-6 text-2xl font-bold text-gray-900 sm:mb-8 sm:text-3xl">Student Cohort Management</h1>
         <Notice message={notice} onDismiss={setNotice} />
+        <ConfirmDialog
+          open={toDelete !== null}
+          title={`Delete ${toDelete?.name ?? 'this cohort'}?`}
+          message="This cannot be undone. A cohort with course offerings or students cannot be deleted; you will see a message instead."
+          confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
+          busy={isDeleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* LEFT COLUMN: THE FORM */}
           <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">Add New Cohort</h2>
+            <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${editing.name}` : 'Add New Cohort'}</h2>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               
@@ -148,8 +207,17 @@ export default function CohortsPage() {
                 disabled={isSubmitting}
                 className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : 'Save Cohort'}
+                {isSubmitting ? 'Saving...' : editing ? 'Save Changes' : 'Save Cohort'}
               </button>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              )}
             </form>
           </div>
 
@@ -169,27 +237,28 @@ export default function CohortsPage() {
                     <th className="p-4 font-medium">Cohort Name</th>
                     <th className="p-4 font-medium">Headcount</th>
                     <th className="p-4 font-medium">Current Term</th>
+                    <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {isLoading ? (
-                    <StatusRow colSpan={3} message="Loading cohorts..." />
+                    <StatusRow colSpan={4} message="Loading cohorts..." />
                   ) : loadError ? (
                     <StatusRow
-                      colSpan={3}
+                      colSpan={4}
                       tone="error"
                       message={`Could not load the cohorts. ${loadError}`}
                       onRetry={retryLoad}
                     />
                   ) : cohorts.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="p-8 text-center text-gray-500">
+                      <td colSpan={4} className="p-8 text-center text-gray-500">
                         No cohorts registered. Add a student group to get started.
                       </td>
                     </tr>
                   ) : (
                     cohorts.map((cohort) => (
-                      <tr key={cohort.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={cohort.id} className={editing?.id === cohort.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}>
                         <td className="p-4 font-medium text-gray-900">{cohort.name}</td>
                         <td className="p-4">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -198,6 +267,28 @@ export default function CohortsPage() {
                         </td>
                         <td className="p-4 text-gray-600">
                           {cohort.currentSemester.replace('_', ' ')}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(cohort)}
+                              aria-label={`Edit ${cohort.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setToDelete(cohort)}
+                              aria-label={`Delete ${cohort.name}`}
+                              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
