@@ -55,7 +55,8 @@ Open http://localhost:3000.
 - The colors and theme are in `app/globals.css`.
 - Shared parts (save messages, loading and error rows, the "Delete?" window) are in `components/`.
 - Teachers and rooms can be edited and deleted from their tables. brain_server refuses to
-  delete a teacher who teaches classes or a room that classes are booked in, and to change
+  delete a teacher who teaches classes or a room that classes are booked in, to lower a
+  teacher's maximum hours below the hours they already teach in a week, and to change
   a room so that a booked class no longer fits (type, seats or equipment); the page shows
   its reason. `tests/row-actions.test.mjs` checks that Edit and Delete buttons name the
   record and that deleting asks first.
@@ -73,7 +74,8 @@ Open http://localhost:3000.
 - Course offerings can be moved to another term or cohort and deleted from their list;
   their course cannot change. A move takes the offering's classes out of the timetable,
   and a delete removes them with it (the "Delete?" window says how many). brain_server
-  refuses to delete an offering with enrolled students, and the page shows its reason.
+  refuses to delete an offering with enrolled students, and to move it to a term where a
+  teacher of its classes would teach too many hours a week; the page shows its reason.
 - Each class of a course offering can have its own teacher ("Teachers" on an offering).
   Classes keep their day and time. brain_server saves all changes or none, and refuses
   (the page shows why) a teacher who would teach too many hours a week, or who is busy or
