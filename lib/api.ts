@@ -36,12 +36,18 @@ export const api = {
   // --- LOCATIONS ---
   getCampuses: () => apiClient.get('/campuses').then(res => res.data),
   createCampus: (data: any) => apiClient.post('/campuses', data).then(res => res.data),
+  updateCampus: (id: string, data: unknown) => apiClient.patch(`/campuses/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteCampus: (id: string) => apiClient.delete(`/campuses/${encodeURIComponent(id)}`).then(res => res.data),
   
   getBuildings: () => apiClient.get('/buildings').then(res => res.data),
   createBuilding: (data: any) => apiClient.post('/buildings', data).then(res => res.data),
+  updateBuilding: (id: string, data: unknown) => apiClient.patch(`/buildings/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteBuilding: (id: string) => apiClient.delete(`/buildings/${encodeURIComponent(id)}`).then(res => res.data),
   
   getFloors: () => apiClient.get('/floors').then(res => res.data),
   createFloor: (data: any) => apiClient.post('/floors', data).then(res => res.data),
+  updateFloor: (id: string, data: unknown) => apiClient.patch(`/floors/${encodeURIComponent(id)}`, data).then(res => res.data),
+  deleteFloor: (id: string) => apiClient.delete(`/floors/${encodeURIComponent(id)}`).then(res => res.data),
 
   // --- COURSE OFFERINGS ---
   getOfferings: () => apiClient.get('/course-offerings').then(res => res.data),
