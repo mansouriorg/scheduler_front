@@ -53,12 +53,14 @@ const hoursWord = (hours: string) => (hours === '1' ? '1 hour' : `${hours} hours
 
 // A teacher in the list of a class on the Course Offerings page, with the hours a
 // week they would teach with that class: "Dr. Amal Ben Salah: 10.5 of 12 hrs
-// (Computer Science)", and ", over the maximum" after the hours when they would
-// teach more than that. The hours come before the department, so that a narrow
-// list cuts the department first.
-export function teacherOptionText(teacher: ListedTeacher, minutes: number): string {
+// (Computer Science)", ", over the maximum" after the hours when they would teach
+// more than that, and ", not free at that time" when the class is in the
+// timetable and they are away or teach another class then. The department comes
+// last, so that a narrow list cuts it first.
+export function teacherOptionText(teacher: ListedTeacher, minutes: number, notFree = false): string {
   const over = minutes > teacher.maxHoursPerWeek * 60 ? ', over the maximum' : '';
-  return `${teacher.name}: ${hoursOfMaximum(minutes, teacher.maxHoursPerWeek)}${over} (${teacher.department})`;
+  const busy = notFree ? ', not free at that time' : '';
+  return `${teacher.name}: ${hoursOfMaximum(minutes, teacher.maxHoursPerWeek)}${over}${busy} (${teacher.department})`;
 }
 
 // Under the list of a class, for the teacher chosen: "With this class: 9 of 12 hrs

@@ -89,6 +89,11 @@ Open http://localhost:3000.
   which teacher who gets a class would go over their maximum, so that saving would be
   refused. `teacherMinutes` in `lib/class-teachers.ts` counts; `lib/teacher-hours.ts`
   writes the texts.
+- For a class already in the timetable, each teacher in its list who is away then (a
+  time off) or teaches another class then (in the same weeks) is marked "not free at
+  that time"; a line under the list says why for the teacher chosen, and the box above
+  Save gives brain_server's own reason when that class gets a new teacher who is not
+  free. `notFreeTeachers` in `lib/class-teachers.ts` finds them.
 - "Times off" on the Teachers page sets the times each week when a teacher cannot teach
   (a day, from, to; every half hour from 08:00 to 18:30). They are saved all together;
   Generate keeps the teacher's classes out of them, and brain_server refuses (the page

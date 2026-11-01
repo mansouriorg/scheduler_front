@@ -11,8 +11,20 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
 import { GraduationCap, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; // <-- Import your centralized API client
-import { classLabels, classTime, teacherChanges, teacherChoices, teacherMinutes, type OfferingClass } from '@/lib/class-teachers';
+import {
+  classLabels,
+  classTime,
+  notFreeLine,
+  notFreeTeachers,
+  notFreeText,
+  teacherChanges,
+  teacherChoices,
+  teacherMinutes,
+  type NotFree,
+  type OfferingClass,
+} from '@/lib/class-teachers';
 import { overMaximumText, teacherOptionText, withClassLine } from '@/lib/teacher-hours';
+import type { TimeOff } from '@/lib/teacher-times';
 
 // 1. Zod Validation Schema
 const offeringSchema = z.object({
@@ -41,8 +53,14 @@ type CourseOption = { id: string; code: string; title: string };
 type CohortOption = { id: string; name: string; headcount: number };
 
 // A teacher in the lists of the Teachers form, with the most hours they may teach
-// a week.
-type Teacher = { id: string; name: string; department: string; maxHoursPerWeek: number };
+// a week and the times each week when they cannot teach.
+type Teacher = {
+  id: string;
+  name: string;
+  department: string;
+  maxHoursPerWeek: number;
+  unavailability?: TimeOff[];
+};
 
 // "DEV-101 for SE - Year 1 in Fall 2026": how buttons and messages name an offering.
 const offeringName = (offering: Offering) =>
@@ -267,24 +285,47 @@ export default function CourseOfferingsPage() {
 
   // For each class in the Teachers form: the minutes a week a teacher would teach
   // in the weeks of the offering's term with that class (their other classes
-  // included, and the other choices in the form), shown in its list, and the line
-  // under the list for the teacher chosen (null: none chosen).
+  // included, and the other choices in the form), shown in its list; the teachers
+  // who are not free at its time (when it is in the timetable), and why; and, for
+  // the teacher chosen, the lines under the list (null: none chosen, or free).
   const classHours = (teaching?.classes ?? []).map((cls) => {
     const without = teaching ? teacherMinutes(offerings, teaching, choices, cls.id) : new Map<string, number>();
     const minutesWith = (teacherId: string) => (without.get(teacherId) ?? 0) + cls.durationMinutes;
+    const notFree = teaching ? notFreeTeachers(offerings, teaching, cls, teachers) : new Map<string, NotFree>();
     const chosen = teachers.find((teacher) => teacher.id === choices[cls.id]);
-    return { minutesWith, chosen: chosen ? withClassLine(minutesWith(chosen.id), chosen.maxHoursPerWeek) : null };
+    const chosenNotFree = chosen ? (notFree.get(chosen.id) ?? null) : null;
+    // The texts read with the list: when the class takes place, then these lines.
+    const describedBy = [
+      `class-teacher-${cls.id}-when`,
+      chosen ? `class-teacher-${cls.id}-hours` : '',
+      chosenNotFree ? `class-teacher-${cls.id}-time` : '',
+    ];
+    return {
+      minutesWith,
+      notFree,
+      chosen: chosen ? withClassLine(minutesWith(chosen.id), chosen.maxHoursPerWeek) : null,
+      chosenNotFree: chosenNotFree ? notFreeLine(chosenNotFree) : null,
+      describedBy: describedBy.filter((id) => id !== '').join(' '),
+    };
   });
 
-  // The teachers who get a class in the Teachers form and would then teach more
-  // than their maximum a week in the offering's term, one sentence each:
-  // brain_server refuses to save that.
+  // What brain_server would refuse to save, one sentence each: a class that gets
+  // a new teacher who is not free at its time, and a teacher who gets a class and
+  // would then teach more than their maximum a week in the offering's term.
+  const changes = teaching ? teacherChanges(teaching.classes, choices) : [];
+  const notFreeNow = changes.flatMap(({ classId, professorId }) => {
+    const index = teaching ? teaching.classes.findIndex((cls) => cls.id === classId) : -1;
+    const teacher = teachers.find((one) => one.id === professorId);
+    const reason = teacher ? classHours[index]?.notFree.get(teacher.id) : undefined;
+    return teaching && teacher && reason ? [notFreeText(teacher.name, teaching, teaching.classes[index], reason)] : [];
+  });
   const minutesNow = teaching ? teacherMinutes(offerings, teaching, choices) : new Map<string, number>();
-  const gaining = teaching ? teacherChanges(teaching.classes, choices).map((change) => change.professorId) : [];
+  const gaining = changes.map((change) => change.professorId);
   const overMaximum = teachers
     .filter((teacher) => gaining.includes(teacher.id))
     .map((teacher) => (teaching ? overMaximumText(teacher, minutesNow.get(teacher.id) ?? 0, teaching.term.name) : null))
     .filter((text): text is string => text !== null);
+  const refusals = [...notFreeNow, ...overMaximum];
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -321,7 +362,8 @@ export default function CourseOfferingsPage() {
                   </p>
                   <p className="mt-2 text-sm text-gray-600">
                     Next to each teacher: the hours a week they would teach in {teaching.term.name} with that class
-                    (their other classes in those weeks included), and their maximum.
+                    (their other classes in those weeks included), and their maximum. For a class already in the
+                    timetable, a teacher who is away or teaches another class at its time is marked not free.
                   </p>
                 </div>
                 {teachers.length === 0 && (
@@ -342,11 +384,7 @@ export default function CourseOfferingsPage() {
                     </p>
                     <select
                       id={`class-teacher-${cls.id}`}
-                      aria-describedby={
-                        classHours[index].chosen
-                          ? `class-teacher-${cls.id}-when class-teacher-${cls.id}-hours`
-                          : `class-teacher-${cls.id}-when`
-                      }
+                      aria-describedby={classHours[index].describedBy}
                       value={choices[cls.id] ?? ''}
                       onChange={(event) => {
                         const value = event.target.value;
@@ -357,7 +395,11 @@ export default function CourseOfferingsPage() {
                       <option value="">No teacher yet</option>
                       {teachers.map((teacher) => (
                         <option key={teacher.id} value={teacher.id}>
-                          {teacherOptionText(teacher, classHours[index].minutesWith(teacher.id))}
+                          {teacherOptionText(
+                            teacher,
+                            classHours[index].minutesWith(teacher.id),
+                            classHours[index].notFree.has(teacher.id),
+                          )}
                         </option>
                       ))}
                     </select>
@@ -369,13 +411,18 @@ export default function CourseOfferingsPage() {
                         {classHours[index].chosen.text}
                       </p>
                     )}
+                    {classHours[index].chosenNotFree && (
+                      <p id={`class-teacher-${cls.id}-time`} className="mt-1 text-xs font-medium text-red-700">
+                        {classHours[index].chosenNotFree}
+                      </p>
+                    )}
                   </div>
                 ))}
                 <div aria-live="polite">
-                  {overMaximum.length > 0 && (
+                  {refusals.length > 0 && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                       <ul className="space-y-1 font-medium">
-                        {overMaximum.map((text) => (
+                        {refusals.map((text) => (
                           <li key={text}>{text}</li>
                         ))}
                       </ul>

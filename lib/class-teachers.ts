@@ -1,5 +1,7 @@
 // Helpers for choosing the teacher of each class on the Course Offerings page.
 
+import type { TimeOff } from './teacher-times';
+
 // A class of an offering, as brain_server sends it. The day and times are null
 // while the class is not in the timetable.
 export type OfferingClass = {
@@ -95,4 +97,88 @@ export function teacherMinutes(
     add(cls.id in choices ? choices[cls.id] : cls.assignedProfessorId, cls.durationMinutes);
   }
   return minutes;
+}
+
+// An offering as the time check reads it: its names, the dates of its term, and
+// its classes with their day and time (null while not in the timetable).
+export type TimeOffering = HoursOffering & {
+  course: { code: string };
+  cohort: { name: string };
+  classes: Pick<OfferingClass, 'id' | 'type' | 'durationMinutes' | 'assignedProfessorId' | 'dayOfWeek' | 'startTime' | 'endTime'>[];
+};
+
+// Why a teacher cannot teach a class at its time: a time off of theirs, or
+// another class they teach then ("DB-201 TD for SE - Year 2").
+export type NotFree =
+  | { kind: 'away'; dayOfWeek: string; startTime: string; endTime: string }
+  | { kind: 'teaching'; label: string; startTime: string; endTime: string };
+
+// "MONDAY" -> "Monday".
+const dayOf = (day: string) => day.charAt(0) + day.slice(1).toLowerCase();
+
+// True when two times ("HH:mm") on the same day share some minutes. A class that
+// ends at 10:00 and one that starts at 10:00 do not.
+const overlaps = (a: { startTime: string; endTime: string }, b: { startTime: string; endTime: string }) =>
+  a.startTime < b.endTime && b.startTime < a.endTime;
+
+// "DEV-101 LECTURE for SE - Year 1", as brain_server names a class.
+const classLabel = (offering: Pick<TimeOffering, 'course' | 'cohort'>, type: string) =>
+  `${offering.course.code} ${type} for ${offering.cohort.name}`;
+
+// For one class of the offering that is in the timetable: the teachers who are
+// not free at its time, and why. A time off comes first; then another class in
+// the timetable that they teach in the same weeks (an offering whose term shares
+// a day with this one), as saved. brain_server checks the same when it saves a
+// new teacher for the class. Empty while the class is not in the timetable.
+export function notFreeTeachers(
+  offerings: TimeOffering[],
+  offering: TimeOffering,
+  cls: Pick<OfferingClass, 'dayOfWeek' | 'startTime' | 'endTime'>,
+  teachers: { id: string; unavailability?: TimeOff[] }[],
+): Map<string, NotFree> {
+  const reasons = new Map<string, NotFree>();
+  const { dayOfWeek, startTime, endTime } = cls;
+  if (dayOfWeek === null || startTime === null || endTime === null) return reasons;
+  const when = { startTime, endTime };
+  for (const teacher of teachers) {
+    const away = (teacher.unavailability ?? []).find((time) => time.dayOfWeek === dayOfWeek && overlaps(time, when));
+    if (away) reasons.set(teacher.id, { kind: 'away', dayOfWeek, startTime: away.startTime, endTime: away.endTime });
+  }
+  for (const other of offerings) {
+    if (other.id === offering.id || termsOverlap(other.term, offering.term) === false) continue;
+    for (const taught of other.classes) {
+      const teacherId = taught.assignedProfessorId;
+      if (teacherId === null || reasons.has(teacherId) || taught.dayOfWeek !== dayOfWeek) continue;
+      if (taught.startTime === null || taught.endTime === null) continue;
+      if (overlaps({ startTime: taught.startTime, endTime: taught.endTime }, when)) {
+        const label = classLabel(other, taught.type);
+        reasons.set(teacherId, { kind: 'teaching', label, startTime: taught.startTime, endTime: taught.endTime });
+      }
+    }
+  }
+  return reasons;
+}
+
+// Under the list of a class, when its chosen teacher is not free at its time:
+// "Not free at that time: times off on Monday from 08:00 to 12:00", or "Not free
+// at that time: teaches DB-201 TD for SE - Year 2 from 08:30 to 10:00".
+export function notFreeLine(reason: NotFree): string {
+  return reason.kind === 'away'
+    ? `Not free at that time: times off on ${dayOf(reason.dayOfWeek)} from ${reason.startTime} to ${reason.endTime}`
+    : `Not free at that time: teaches ${reason.label} from ${reason.startTime} to ${reason.endTime}`;
+}
+
+// Above Save, for a class that gets a new teacher who is not free at its time:
+// the sentence brain_server answers when it refuses to save that.
+export function notFreeText(
+  name: string,
+  offering: Pick<TimeOffering, 'course' | 'cohort'>,
+  cls: Pick<OfferingClass, 'type' | 'dayOfWeek' | 'startTime' | 'endTime'>,
+  reason: NotFree,
+): string {
+  const day = dayOf(cls.dayOfWeek ?? '');
+  const what = `${name} cannot teach ${classLabel(offering, cls.type)} on ${day} from ${cls.startTime} to ${cls.endTime}`;
+  return reason.kind === 'away'
+    ? `${what}, because ${name} is not available on ${day} from ${reason.startTime} to ${reason.endTime}.`
+    : `${what}, because at that time ${name} teaches ${reason.label} (${reason.startTime} to ${reason.endTime}).`;
 }
