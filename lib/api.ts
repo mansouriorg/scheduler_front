@@ -15,6 +15,9 @@ export const api = {
   createTeacher: (data: any) => apiClient.post('/professors', data).then(res => res.data),
   updateTeacher: (id: string, data: unknown) => apiClient.patch(`/professors/${encodeURIComponent(id)}`, data).then(res => res.data),
   deleteTeacher: (id: string) => apiClient.delete(`/professors/${encodeURIComponent(id)}`).then(res => res.data),
+  // Replaces the times each week when the teacher cannot teach.
+  setTeacherTimesOff: (id: string, times: { dayOfWeek: string; startTime: string; endTime: string }[]) =>
+    apiClient.put(`/professors/${encodeURIComponent(id)}/unavailability`, { times }).then(res => res.data),
 
   // --- CLASSROOMS ---
   getRooms: () => apiClient.get('/rooms').then(res => res.data),

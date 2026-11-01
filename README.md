@@ -42,7 +42,7 @@ Open http://localhost:3000.
 | `/`           | `app/page.tsx`            | choose a term; see its timetable (each class with its room and teacher), filter by cohort, generate it or clear it |
 | `/locations`  | `app/locations/page.tsx`  | add, edit, move, delete and list campuses, buildings and floors |
 | `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
-| `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference) |
+| `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference, times off) |
 | `/courses`    | `app/courses/page.tsx`    | add, edit, delete and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add, edit, delete and list student groups and their headcount |
 | `/terms`      | `app/terms/page.tsx`      | add, edit, delete and list academic terms and their dates |
@@ -79,6 +79,11 @@ Open http://localhost:3000.
   (the page shows why) a teacher who would teach too many hours a week, or who is busy or
   away when a class takes place. `lib/class-teachers.ts` names the classes and finds the
   changes (`class-teachers.test.mjs`; `tests/offering-teachers.test.mjs` checks the button).
+- "Times off" on the Teachers page sets the times each week when a teacher cannot teach
+  (a day, from, to; every half hour from 08:00 to 18:30). They are saved all together;
+  Generate keeps the teacher's classes out of them, and brain_server refuses (the page
+  shows why) a time off that covers a class of the teacher already in the timetable.
+  `lib/teacher-times.ts` lists, names and checks them (`teacher-times.test.mjs`).
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page and names the room of
