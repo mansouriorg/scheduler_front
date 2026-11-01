@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
+import { NoMatchRow, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -33,6 +35,8 @@ export default function CohortsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The cohort shown in the form for changes (null: the form adds a new cohort),
   // and the cohort waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Cohort | null>(null);
@@ -136,6 +140,14 @@ export default function CohortsPage() {
     }
   };
 
+  // The cohorts that have what is typed in the search box, in their name, headcount or
+  // current term.
+  const shownCohorts = filterBySearch(cohorts, search, (cohort) => [
+    cohort.name,
+    `${cohort.headcount} students`,
+    cohort.currentSemester.replace('_', ' '),
+  ]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -229,12 +241,20 @@ export default function CohortsPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-800">Active Cohorts</h2>
-              <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
-                Total Groups: {cohorts.length}
-              </span>
-            </div>
+            <TableSearchBar
+              title="Active Cohorts"
+              inputId="search-cohorts"
+              label="Search cohorts"
+              placeholder="Name or term"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownCohorts.length, cohorts.length, search, 'cohort', 'cohorts')}
+              badge={
+                <span className="text-sm text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200">
+                  Total Groups: {cohorts.length}
+                </span>
+              }
+            />
             
             <div className="@container overflow-x-auto">
               <table className={`w-full text-left border-collapse ${cards.table}`}>
@@ -262,8 +282,10 @@ export default function CohortsPage() {
                         No cohorts registered. Add a student group to get started.
                       </td>
                     </tr>
+                  ) : shownCohorts.length === 0 ? (
+                    <NoMatchRow colSpan={4} text={noMatchText(search, 'cohort')} inputId="search-cohorts" onClear={() => setSearch('')} />
                   ) : (
-                    cohorts.map((cohort) => (
+                    shownCohorts.map((cohort) => (
                       <tr key={cohort.id} className={`${cards.row} ${editing?.id === cohort.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
                         <td className={`${cards.title} font-medium text-gray-900`}>{cohort.name}</td>
                         <td className={cards.cell}>

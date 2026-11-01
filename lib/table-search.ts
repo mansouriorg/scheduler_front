@@ -47,6 +47,31 @@ export function filterBySearch<T>(rows: T[], query: string, valuesOf: (row: T) =
   return rows.filter((row) => matchesSearch(valuesOf(row), query));
 }
 
+// The Locations page: the buildings that have what is typed in their campus, name,
+// code or floors ("Level 2"), and the campuses whose name has it or that have such a
+// building. A campus found by its name keeps all its buildings, since they all have
+// its name. The floors of a building found are all shown with it.
+export function searchLocations<
+  Campus extends { id: string; name: string },
+  Building extends { id: string; name: string; code: string; campusId: string },
+>(
+  campuses: Campus[],
+  buildings: Building[],
+  floors: { buildingId: string; level: string }[],
+  query: string,
+): { campuses: Campus[]; buildings: Building[] } {
+  const shownBuildings = filterBySearch(buildings, query, (building) => [
+    campuses.find((campus) => campus.id === building.campusId)?.name,
+    building.name,
+    building.code,
+    ...floors.filter((floor) => floor.buildingId === building.id).map((floor) => `Level ${floor.level}`),
+  ]);
+  const shownCampuses = campuses.filter(
+    (campus) => matchesSearch([campus.name], query) || shownBuildings.some((building) => building.campusId === campus.id),
+  );
+  return { campuses: shownCampuses, buildings: shownBuildings };
+}
+
 // "3 of 12 teachers": how many rows the search shows. Null while nothing is typed.
 export function searchCount(shown: number, total: number, query: string, one: string, many: string): string | null {
   if (searchWords(query).length === 0) return null;

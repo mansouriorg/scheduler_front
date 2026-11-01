@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
+import { NoMatchRow, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -40,6 +42,8 @@ export default function TermsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The term shown in the form for changes (null: the form adds a new term),
   // and the term waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Term | null>(null);
@@ -162,6 +166,15 @@ export default function TermsPage() {
     });
   };
 
+  // The terms that have what is typed in the search box, in their name, type or dates,
+  // as the table shows them.
+  const shownTerms = filterBySearch(terms, search, (term) => [
+    term.name,
+    term.type.replace('_', ' '),
+    formatDate(term.startDate),
+    formatDate(term.endDate),
+  ]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -260,9 +273,15 @@ export default function TermsPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-semibold text-gray-800">Term Schedule</h2>
-            </div>
+            <TableSearchBar
+              title="Term Schedule"
+              inputId="search-terms"
+              label="Search terms"
+              placeholder="Name, type or date"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownTerms.length, terms.length, search, 'term', 'terms')}
+            />
             
             <div className="@container overflow-x-auto">
               <table className={`w-full text-left border-collapse ${cards.table}`}>
@@ -291,8 +310,10 @@ export default function TermsPage() {
                         No terms found. Create a semester to begin scheduling.
                       </td>
                     </tr>
+                  ) : shownTerms.length === 0 ? (
+                    <NoMatchRow colSpan={5} text={noMatchText(search, 'term')} inputId="search-terms" onClear={() => setSearch('')} />
                   ) : (
-                    terms.map((term) => (
+                    shownTerms.map((term) => (
                       <tr key={term.id} className={`${cards.row} ${editing?.id === term.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
                         <td className={`${cards.title} font-bold text-gray-900`}>{term.name}</td>
                         <td className={`${cards.cell} text-gray-600`}>

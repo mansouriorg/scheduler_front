@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusBlock } from '@/components/status-message';
+import { NoMatchBlock, TableSearchBar } from '@/components/table-search';
+import { noMatchText, searchCount, searchLocations } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -48,6 +50,8 @@ export default function LocationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<LocationTarget | null>(null);
   const [toDelete, setToDelete] = useState<LocationTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -185,6 +189,12 @@ export default function LocationsPage() {
     }
   };
 
+  // The campuses and buildings that have what is typed in the search box (see
+  // searchLocations in lib/table-search.ts), and how many of each there are.
+  const shown = searchLocations(campuses, buildings, floors, search);
+  const campusCount = searchCount(shown.campuses.length, campuses.length, search, 'campus', 'campuses');
+  const buildingCount = searchCount(shown.buildings.length, buildings.length, search, 'building', 'buildings');
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -296,9 +306,15 @@ export default function LocationsPage() {
 
         {/* DATA DISPLAY AREA */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-xl font-semibold text-gray-800">Current Infrastructure Tree</h2>
-          </div>
+          <TableSearchBar
+            title="Current Infrastructure Tree"
+            inputId="search-locations"
+            label="Search locations"
+            placeholder="Campus, building, code or level"
+            value={search}
+            onChange={setSearch}
+            count={campusCount && `${campusCount}, ${buildingCount}`}
+          />
           <div className="p-6">
             {isLoading ? (
               <StatusBlock message="Loading locations..." />
@@ -310,9 +326,11 @@ export default function LocationsPage() {
               />
             ) : campuses.length === 0 ? (
               <p className="text-gray-500 text-center py-4">No locations defined yet. Start by adding a Campus above!</p>
+            ) : shown.campuses.length === 0 ? (
+              <NoMatchBlock text={noMatchText(search, 'campus or building')} inputId="search-locations" onClear={() => setSearch('')} />
             ) : (
               <div className="space-y-6">
-                {campuses.map(campus => (
+                {shown.campuses.map(campus => (
                   <div key={campus.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <h3 className="font-bold text-lg text-blue-800">🏛 {campus.name}</h3>
@@ -338,7 +356,7 @@ export default function LocationsPage() {
                       </div>
                     </div>
                     <div className="pl-6 space-y-4">
-                      {buildings.filter(b => b.campusId === campus.id).map(building => (
+                      {shown.buildings.filter(b => b.campusId === campus.id).map(building => (
                         <div key={building.id} className="p-3 bg-white border border-gray-200 rounded-md shadow-sm">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <h4 className="font-semibold text-gray-800 text-md">🏢 {building.name} <span className="text-xs text-gray-500 font-normal">({building.code})</span></h4>
