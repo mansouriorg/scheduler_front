@@ -46,7 +46,7 @@ Open http://localhost:3000.
 | `/courses`    | `app/courses/page.tsx`    | add, edit, delete and list courses: credits, hours, lecture/TD/TP parts |
 | `/cohorts`    | `app/cohorts/page.tsx`    | add, edit, delete and list student groups and their headcount |
 | `/terms`      | `app/terms/page.tsx`      | add, edit, delete and list academic terms and their dates |
-| `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term; move or delete an offering |
+| `/offerings`  | `app/offerings/page.tsx`  | choose which cohort takes which course in a term, and the teacher of each class; move or delete an offering |
 
 - The API calls are in `lib/api.ts`.
 - The sidebar and the phone menu are in `components/app-sidebar.tsx`; the page frame
@@ -74,6 +74,11 @@ Open http://localhost:3000.
   their course cannot change. A move takes the offering's classes out of the timetable,
   and a delete removes them with it (the "Delete?" window says how many). brain_server
   refuses to delete an offering with enrolled students, and the page shows its reason.
+- Each class of a course offering can have its own teacher ("Teachers" on an offering).
+  Classes keep their day and time. brain_server saves all changes or none, and refuses
+  (the page shows why) a teacher who would teach too many hours a week, or who is busy or
+  away when a class takes place. `lib/class-teachers.ts` names the classes and finds the
+  changes (`class-teachers.test.mjs`; `tests/offering-teachers.test.mjs` checks the button).
 - `lib/api-error.ts` turns API errors into readable sentences.
 - Form rules are in `lib/validations/`; the course rules are tested in `course.test.mjs`.
 - `lib/timetable.ts` counts the class blocks shown on the home page and names the room of

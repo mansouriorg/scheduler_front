@@ -8,8 +8,10 @@ import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { GraduationCap, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api'; // <-- Import your centralized API client
+import { classLabels, classTime, teacherChanges, teacherChoices, type OfferingClass } from '@/lib/class-teachers';
 
 // 1. Zod Validation Schema
 const offeringSchema = z.object({
@@ -29,8 +31,11 @@ type Offering = {
   term: { name: string };
   course: { code: string; title: string };
   cohort: { name: string };
-  classes: { startTime: string | null }[];
+  classes: OfferingClass[];
 };
+
+// A teacher in the lists of the Teachers form.
+type Teacher = { id: string; name: string; department: string };
 
 // "DEV-101 for SE - Year 1 in Fall 2026": how buttons and messages name an offering.
 const offeringName = (offering: Offering) =>
@@ -67,6 +72,7 @@ export default function CourseOfferingsPage() {
   const [terms, setTerms] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [cohorts, setCohorts] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -78,6 +84,11 @@ export default function CourseOfferingsPage() {
   const [editing, setEditing] = useState<Offering | null>(null);
   const [toDelete, setToDelete] = useState<Offering | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // The offering whose classes are shown in the Teachers form (null: none),
+  // and the teacher chosen for each class ('' for no teacher).
+  const [teaching, setTeaching] = useState<Offering | null>(null);
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [isSavingTeachers, setIsSavingTeachers] = useState(false);
 
   const {
     register,
@@ -93,19 +104,21 @@ export default function CourseOfferingsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Load the four lists together. If one request fails, the page says so
+        // Load the five lists together. If one request fails, the page says so
         // instead of showing empty lists.
-        const [termData, courseData, cohortData, offeringData] = await Promise.all([
+        const [termData, courseData, cohortData, offeringData, teacherData] = await Promise.all([
           api.getTerms(),
           api.getCourses(),
           api.getCohorts(),
           api.getOfferings(),
+          api.getTeachers(),
         ]);
 
         setTerms(termData);
         setCourses(courseData);
         setCohorts(cohortData);
         setOfferings(offeringData);
+        setTeachers(teacherData);
         setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch data', error);
@@ -162,6 +175,7 @@ export default function CourseOfferingsPage() {
   // Puts an offering from the list into the form, to move it to another term or
   // cohort. The course select is hidden while editing: the course cannot change.
   const startEdit = (offering: Offering) => {
+    setTeaching(null);
     setEditing(offering);
     setNotice(null);
     reset({
@@ -178,6 +192,49 @@ export default function CourseOfferingsPage() {
     reset();
   };
 
+  // Shows the classes of an offering in the form, each with a list of
+  // teachers. Only one form is open at a time, so Edit is left first.
+  const startTeachers = (offering: Offering) => {
+    if (editing) cancelEdit();
+    setNotice(null);
+    setTeaching(offering);
+    setChoices(teacherChoices(offering.classes));
+    // The lists appear on the next render; focus the first one after that.
+    const first = offering.classes[0];
+    if (first) setTimeout(() => document.getElementById(`class-teacher-${first.id}`)?.focus(), 0);
+  };
+
+  // Saves the teachers chosen in the form, all together. brain_server refuses,
+  // and says why, when a teacher would teach more hours a week than allowed or
+  // is busy at the time of a class that is already in the timetable; the form
+  // then stays open, so that another teacher can be chosen.
+  const saveTeachers = async () => {
+    if (teaching === null) return;
+    const changes = teacherChanges(teaching.classes, choices);
+    if (changes.length === 0) {
+      setNotice({ type: 'success', text: `Nothing changed: every class of ${offeringName(teaching)} keeps its teacher.` });
+      setTeaching(null);
+      return;
+    }
+    setIsSavingTeachers(true);
+    setNotice(null);
+    try {
+      await api.assignTeachers(teaching.id, changes);
+      setNotice({ type: 'success', text: `The teachers of ${offeringName(teaching)} were saved.` });
+      setTeaching(null);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice({ type: 'error', text: `Could not save the teachers. ${getErrorMessage(error)}` });
+    } finally {
+      setIsSavingTeachers(false);
+    }
+  };
+
+  // The name shown on a class: its teacher, or "No teacher" while it has none.
+  const teacherName = (id: string | null) =>
+    id ? (teachers.find((teacher) => teacher.id === id)?.name ?? 'Unknown teacher') : 'No teacher';
+
   // Runs when "Delete" is confirmed in the window. The server refuses while
   // students are enrolled; its message (why) is shown as it is.
   const confirmDelete = async () => {
@@ -187,6 +244,7 @@ export default function CourseOfferingsPage() {
       await api.deleteOffering(toDelete.id);
       setNotice({ type: 'success', text: `${offeringName(toDelete)} was deleted.` });
       if (editing?.id === toDelete.id) cancelEdit();
+      if (teaching?.id === toDelete.id) setTeaching(null);
       setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error(error);
@@ -196,6 +254,9 @@ export default function CourseOfferingsPage() {
       setToDelete(null);
     }
   };
+
+  // "LECTURE", "TD 1", "TD 2": the names of the classes in the Teachers form.
+  const teachingLabels = teaching ? classLabels(teaching.classes) : [];
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -216,6 +277,75 @@ export default function CourseOfferingsPage() {
           
           {/* LEFT COLUMN: THE FORM */}
           <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
+            {teaching ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void saveTeachers();
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800">Teachers for {offeringName(teaching)}</h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Each class can have its own teacher. A class that is already in the timetable keeps its day and
+                    time, so its teacher must be free then.
+                  </p>
+                </div>
+                {teachers.length === 0 && (
+                  <p className="text-sm text-gray-700">
+                    No teachers yet. Add them on the{' '}
+                    <Link href="/teachers" className="font-medium text-blue-700 underline hover:text-blue-800">
+                      Teachers page
+                    </Link>{' '}
+                    first.
+                  </p>
+                )}
+                {teaching.classes.length === 0 && <p className="text-sm text-gray-700">This offering has no classes.</p>}
+                {teaching.classes.map((cls, index) => (
+                  <div key={cls.id}>
+                    <label htmlFor={`class-teacher-${cls.id}`} className="block text-sm font-medium text-gray-700">{teachingLabels[index]}</label>
+                    <p id={`class-teacher-${cls.id}-when`} className="mb-1 text-xs text-gray-600">
+                      {cls.durationMinutes} mins, {classTime(cls) ?? 'not in the timetable yet'}
+                    </p>
+                    <select
+                      id={`class-teacher-${cls.id}`}
+                      aria-describedby={`class-teacher-${cls.id}-when`}
+                      value={choices[cls.id] ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setChoices((prev) => ({ ...prev, [cls.id]: value }));
+                      }}
+                      className="w-full rounded-lg border border-gray-500 bg-white px-3 py-2.5 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-blue-600 sm:text-sm"
+                    >
+                      <option value="">No teacher yet</option>
+                      {teachers.map((teacher) => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.name} ({teacher.department})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <div className="mt-6 space-y-3">
+                  <button
+                    type="submit"
+                    disabled={isSavingTeachers}
+                    className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSavingTeachers ? 'Saving...' : 'Save Teachers'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTeaching(null)}
+                    className="w-full rounded-lg border border-gray-500 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+            <>
             <h2 className="text-xl font-semibold mb-6 text-gray-800">{editing ? `Edit ${offeringName(editing)}` : 'New Assignment'}</h2>
             {editing && scheduledCount(editing) > 0 && (
               <p className="-mt-4 mb-6 text-sm text-gray-600">
@@ -303,6 +433,8 @@ export default function CourseOfferingsPage() {
                 )}
               </div>
             </form>
+            </>
+            )}
           </div>
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
@@ -327,7 +459,7 @@ export default function CourseOfferingsPage() {
                   <div
                     key={offering.id}
                     className={
-                      editing?.id === offering.id
+                      editing?.id === offering.id || teaching?.id === offering.id
                         ? 'rounded-lg border border-blue-400 bg-blue-50 p-4 shadow-sm'
                         : 'border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:border-blue-300 transition-colors'
                     }
@@ -348,9 +480,10 @@ export default function CourseOfferingsPage() {
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Generated Schedulable Blocks:</h4>
                       <div className="flex flex-wrap gap-2">
                         {offering.classes.map((cls: any) => (
-                          <div key={cls.id} className="bg-orange-50 text-orange-800 border border-orange-200 rounded px-3 py-1.5 text-xs font-medium flex items-center shadow-sm">
+                          <div key={cls.id} className="bg-orange-50 text-orange-800 border border-orange-200 rounded px-3 py-1.5 text-xs font-medium flex flex-wrap items-center shadow-sm">
                             <span className="font-bold mr-1">{cls.type}:</span> {cls.durationMinutes} mins 
                             <span className="ml-2 text-orange-700">({cls.requiresRoomType})</span>
+                            <span className="ml-2 whitespace-nowrap border-l border-orange-200 pl-2 text-gray-800">{teacherName(cls.assignedProfessorId)}</span>
                           </div>
                         ))}
                       </div>
@@ -360,7 +493,16 @@ export default function CourseOfferingsPage() {
                       <p className="text-xs text-gray-600">
                         {scheduledCount(offering)} of {classCount(offering.classes.length)} in the timetable
                       </p>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startTeachers(offering)}
+                          aria-label={`Teachers for ${offeringName(offering)}`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                        >
+                          <GraduationCap className="h-4 w-4" aria-hidden="true" />
+                          Teachers
+                        </button>
                         <button
                           type="button"
                           onClick={() => startEdit(offering)}
