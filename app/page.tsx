@@ -5,12 +5,15 @@ import { api } from '@/lib/api';
 import { StatusBlock } from '@/components/status-message';
 import { getErrorMessage } from '@/lib/api-error';
 import {
-  countClassesForCohort,
+  ALL_CLASSES,
+  countClassesInView,
   defaultTermId,
+  inView,
   localDay,
   roomLabel,
   teacherLabel,
   termLabel,
+  viewChoices,
   type OfferingRow,
   type TermChoice,
   type TimetableClass,
@@ -29,10 +32,11 @@ export default function Home() {
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   
-  // The term whose timetable is shown, generated and cleared, and the cohort filter.
+  // The term whose timetable is shown, generated and cleared, and the View list:
+  // every class, or the week of one cohort, teacher or room (see lib/timetable.ts).
   const [terms, setTerms] = useState<TermChoice[]>([]);
   const [selectedTermId, setSelectedTermId] = useState('');
-  const [selectedCohort, setSelectedCohort] = useState<string>('All');
+  const [selectedView, setSelectedView] = useState<string>(ALL_CLASSES);
 
   const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
@@ -63,6 +67,8 @@ export default function Home() {
               endTime: cls.endTime,
               room: roomLabel(cls.room), // for example Lab 304, Science Hub (SCI) - Level 3
               teacher: teacherLabel(cls.assignedProfessorId, teachers),
+              roomId: cls.assignedRoomId ?? null,
+              teacherId: cls.assignedProfessorId,
             });
           }
         });
@@ -115,7 +121,7 @@ export default function Home() {
     try {
       const res = await api.clearTimetable(selectedTermId);
       setMessage({ text: res.message, type: 'success' });
-      setSelectedCohort('All');
+      setSelectedView(ALL_CLASSES);
       await fetchSchedule();
     } catch (error) {
       console.error(error);
@@ -126,30 +132,27 @@ export default function Home() {
     }
   };
 
-  // Another term: its own timetable, all its cohorts.
+  // Another term: its own timetable, all its classes.
   const chooseTerm = (termId: string) => {
     setSelectedTermId(termId);
-    setSelectedCohort('All');
+    setSelectedView(ALL_CLASSES);
     setMessage(null);
   };
 
   // The classes of the chosen term: the page shows, counts and clears only these.
   const termSchedule = schedule.filter((cls) => cls.termId === selectedTermId);
   const termName = terms.find((term) => term.id === selectedTermId)?.name ?? 'this term';
-  // The cohorts that have classes in that timetable, for the cohort filter.
-  const availableCohorts: string[] = Array.from(new Set(termSchedule.map((cls) => cls.cohortName))).sort();
+  // The cohorts, teachers and rooms of that timetable, for the View list. A view
+  // that is not in the list any more (after Generate, for example) shows every class.
+  const choices = viewChoices(termSchedule);
+  const shown = [...choices.cohorts, ...choices.teachers, ...choices.rooms].find((choice) => choice.value === selectedView);
+  const view = shown ? shown.value : ALL_CLASSES;
 
-  // UPDATED: Now filters by the selected cohort!
-  const getClassesForDay = (day: string) => {
-    return termSchedule.filter((cls) => {
-      const matchesDay = cls.dayOfWeek === day;
-      const matchesCohort = selectedCohort === 'All' || cls.cohortName === selectedCohort;
-      return matchesDay && matchesCohort;
-    });
-  };
+  // The classes of a day in the chosen view.
+  const getClassesForDay = (day: string) => termSchedule.filter((cls) => cls.dayOfWeek === day && inView(cls, view));
 
-  // Number of class blocks shown with the current cohort filter, on all days.
-  const visibleCount = countClassesForCohort(termSchedule, selectedCohort);
+  // Number of class blocks shown in the chosen view, on all days.
+  const visibleCount = countClassesInView(termSchedule, view);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-6 lg:p-8">
@@ -169,7 +172,7 @@ export default function Home() {
                   : terms.length === 0
                     ? 'There is no term yet. Add one on the Academic Terms page first.'
                     : termSchedule.length > 0
-                    ? `Viewing ${visibleCount} scheduled class blocks.`
+                    ? `Viewing ${visibleCount} scheduled class ${visibleCount === 1 ? 'block' : 'blocks'}${shown ? ` of ${shown.label}` : ''}.`
                     : 'No classes scheduled yet. Click generate to start the AI engine.'}
             </p>
           </div>
@@ -197,21 +200,37 @@ export default function Home() {
               </div>
             )}
 
-            {/* NEW: Cohort Filter Dropdown */}
-            {availableCohorts.length > 0 && (
+            {/* The View list: every class, or the week of one cohort, teacher or room. */}
+            {termSchedule.length > 0 && (
               <div className="flex max-w-full items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-gray-50 p-2">
                 <span className="text-sm font-bold text-gray-500 pl-2">👥 View:</span>
-                <select 
-                  value={selectedCohort} 
-                  onChange={(e) => setSelectedCohort(e.target.value)}
+                <select
+                  id="timetable-view"
+                  aria-label="View"
+                  value={view}
+                  onChange={(e) => setSelectedView(e.target.value)}
                   className="min-w-0 cursor-pointer rounded-lg border-none bg-white py-2 pr-8 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="All">All University Cohorts (Master View)</option>
-                  <optgroup label="Specific Student Groups">
-                    {availableCohorts.map(cohort => (
-                      <option key={cohort} value={cohort}>{cohort}</option>
+                  <option value={ALL_CLASSES}>All classes (master view)</option>
+                  <optgroup label="Cohorts">
+                    {choices.cohorts.map((choice) => (
+                      <option key={choice.value} value={choice.value}>{choice.label}</option>
                     ))}
                   </optgroup>
+                  {choices.teachers.length > 0 && (
+                    <optgroup label="Teachers">
+                      {choices.teachers.map((choice) => (
+                        <option key={choice.value} value={choice.value}>{choice.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {choices.rooms.length > 0 && (
+                    <optgroup label="Rooms">
+                      {choices.rooms.map((choice) => (
+                        <option key={choice.value} value={choice.value}>{choice.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
             )}
@@ -327,8 +346,8 @@ export default function Home() {
                           {cls.courseCode}: {cls.courseTitle}
                         </h3>
                         
-                        {/* Highlight the cohort name if we are in Master View, otherwise it's redundant */}
-                        {selectedCohort === 'All' && (
+                        {/* The cohort, unless the view shows only that cohort's classes. */}
+                        {view.startsWith('cohort:') === false && (
                           <div className="text-xs font-medium text-gray-500 mb-2">
                             👥 {cls.cohortName}
                           </div>

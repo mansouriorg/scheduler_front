@@ -1,7 +1,5 @@
 // Helpers for the timetable on the home page.
 
-export type CohortClass = { cohortName: string };
-
 // The room of a class as brain_server sends it: its name, building and floor.
 export type ClassRoom = {
   name: string;
@@ -21,6 +19,7 @@ export type OfferingRow = {
     startTime: string | null;
     endTime: string | null;
     assignedProfessorId: string | null;
+    assignedRoomId?: string | null;
     room?: ClassRoom;
   }[];
 };
@@ -38,6 +37,9 @@ export type TimetableClass = {
   endTime: string | null;
   room: string;
   teacher: string;
+  // Their ids, for the View list (null: no room or no teacher yet).
+  roomId: string | null;
+  teacherId: string | null;
 };
 
 // Where a class takes place, for example "Lab 304, Science Hub (SCI) - Level 3"
@@ -92,8 +94,42 @@ export function defaultTermId(terms: Pick<TermChoice, 'id' | 'startDate' | 'endD
   return byStart.length > 0 ? byStart[byStart.length - 1].id : '';
 }
 
-// How many class blocks are shown for the chosen cohort. 'All' shows every cohort.
-export function countClassesForCohort(classes: CohortClass[], cohort: string): number {
-  if (cohort === 'All') return classes.length;
-  return classes.filter((cls) => cls.cohortName === cohort).length;
+// A class as the View list reads it.
+export type ViewClass = Pick<TimetableClass, 'cohortName' | 'room' | 'roomId' | 'teacher' | 'teacherId'>;
+
+// A choice of the View list: its value ("cohort:SE - Year 1", "teacher:<id>" or
+// "room:<id>") and its text.
+export type ViewChoice = { value: string; label: string };
+
+// The value of the View list that shows every class.
+export const ALL_CLASSES = 'All';
+
+// The choices of the View list for the classes of a term: their cohorts, their
+// teachers and their rooms, each once and sorted by name. Classes without a
+// teacher or a room yet add no choice.
+export function viewChoices(classes: ViewClass[]): { cohorts: ViewChoice[]; teachers: ViewChoice[]; rooms: ViewChoice[] } {
+  const cohorts = new Map<string, string>();
+  const teachers = new Map<string, string>();
+  const rooms = new Map<string, string>();
+  for (const cls of classes) {
+    cohorts.set(`cohort:${cls.cohortName}`, cls.cohortName);
+    if (cls.teacherId !== null) teachers.set(`teacher:${cls.teacherId}`, cls.teacher);
+    if (cls.roomId !== null) rooms.set(`room:${cls.roomId}`, cls.room);
+  }
+  const sorted = (choices: Map<string, string>) =>
+    [...choices].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  return { cohorts: sorted(cohorts), teachers: sorted(teachers), rooms: sorted(rooms) };
+}
+
+// True when the View list shows the class: every class for ALL_CLASSES, else the
+// classes of one cohort, one teacher or one room.
+export function inView(cls: ViewClass, view: string): boolean {
+  if (view === ALL_CLASSES || view === `cohort:${cls.cohortName}`) return true;
+  if (cls.teacherId !== null && view === `teacher:${cls.teacherId}`) return true;
+  return cls.roomId !== null && view === `room:${cls.roomId}`;
+}
+
+// How many class blocks the view shows, on all days.
+export function countClassesInView(classes: ViewClass[], view: string): number {
+  return classes.filter((cls) => inView(cls, view)).length;
 }

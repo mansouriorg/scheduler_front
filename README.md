@@ -39,7 +39,7 @@ Open http://localhost:3000.
 
 | Path          | File                      | What you do there                                   |
 |---------------|---------------------------|-----------------------------------------------------|
-| `/`           | `app/page.tsx`            | choose a term; see its timetable (each class with its room and teacher), filter by cohort, generate it or clear it |
+| `/`           | `app/page.tsx`            | choose a term; see its timetable (each class with its room and teacher), or the week of one cohort, teacher or room; generate it or clear it |
 | `/locations`  | `app/locations/page.tsx`  | add, edit, move, delete and list campuses, buildings and floors |
 | `/classrooms` | `app/classrooms/page.tsx` | add, edit, delete and list rooms (capacity, type, floor, equipment) |
 | `/teachers`   | `app/teachers/page.tsx`   | add, edit, delete and list professors (hours, time preference, times off) |
@@ -127,6 +127,10 @@ Open http://localhost:3000.
   each class with its building and floor, and its teacher (tested in `timetable.test.mjs`).
   It also names the terms and picks the one the home page shows first: the term going on
   today, else the next one, else the latest one.
+- The View list of the home page shows every class of the term, or the week of one
+  cohort, one teacher or one room (the cohorts, teachers and rooms of that term's
+  timetable, by name). Another term, or Clear, shows every class again.
+  `viewChoices` and `inView` in `lib/timetable.ts` make the list and choose the classes.
 - The home page works on one term at a time: it shows the timetable of the chosen term,
   Generate places only that term's classes, and "Clear timetable" takes the room, day and
   time off that term's classes after asking first (other terms stay); Generate then places
