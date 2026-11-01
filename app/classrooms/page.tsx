@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
+import { NoMatchRow, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -50,6 +52,8 @@ export default function ClassroomsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The room shown in the form for changes (null: the form adds a new room),
   // and the room waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Room | null>(null);
@@ -161,6 +165,15 @@ export default function ClassroomsPage() {
       setToDelete(null);
     }
   };
+
+  // The rooms that have what is typed in the search box, in their name, type, building and
+  // floor, or equipment, as the table shows them.
+  const shownRooms = filterBySearch(rooms, search, (room) => [
+    room.name,
+    room.roomType.replace('_', ' '),
+    findFloorLabel(floorOptions, room.floorId),
+    ...room.equipment.map((eq) => eq.replace('_', ' ')),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -296,9 +309,15 @@ export default function ClassroomsPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-semibold text-gray-800">Available Rooms & Labs</h2>
-            </div>
+            <TableSearchBar
+              title="Available Rooms & Labs"
+              inputId="search-rooms"
+              label="Search rooms"
+              placeholder="Name, type, building or equipment"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownRooms.length, rooms.length, search, 'room', 'rooms')}
+            />
             
             <div className="@container overflow-x-auto">
               <table className={`w-full text-left border-collapse ${cards.table}`}>
@@ -328,8 +347,10 @@ export default function ClassroomsPage() {
                         No rooms found. Add one to see them here!
                       </td>
                     </tr>
+                  ) : shownRooms.length === 0 ? (
+                    <NoMatchRow colSpan={6} text={noMatchText(search, 'room')} inputId="search-rooms" onClear={() => setSearch('')} />
                   ) : (
-                    rooms.map((room) => (
+                    shownRooms.map((room) => (
                       <tr key={room.id} className={`${cards.row} ${editing?.id === room.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
                         <td className={`${cards.title} font-medium text-gray-900`}>{room.name}</td>
                         <td className={`${cards.cell} text-gray-600`}>

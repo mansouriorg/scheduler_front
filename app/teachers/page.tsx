@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
+import { NoMatchRow, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Clock, Pencil, Trash2 } from 'lucide-react';
@@ -56,6 +58,8 @@ export default function TeachersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The teacher shown in the form for changes (null: the form adds a new teacher),
   // and the teacher waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Teacher | null>(null);
@@ -210,6 +214,9 @@ export default function TeachersPage() {
       setToDelete(null);
     }
   };
+
+  // The teachers that have what is typed in the search box, in their name or department.
+  const shownTeachers = filterBySearch(teachers, search, (teacher) => [teacher.name, teacher.department]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -427,9 +434,15 @@ export default function TeachersPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-semibold text-gray-800">Current Teachers</h2>
-            </div>
+            <TableSearchBar
+              title="Current Teachers"
+              inputId="search-teachers"
+              label="Search teachers"
+              placeholder="Name or department"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownTeachers.length, teachers.length, search, 'teacher', 'teachers')}
+            />
             
             <div className="@container overflow-x-auto">
               <table className={`w-full text-left border-collapse ${cards.table}`}>
@@ -458,8 +471,10 @@ export default function TeachersPage() {
                         No teachers found. Add one to see them here!
                       </td>
                     </tr>
+                  ) : shownTeachers.length === 0 ? (
+                    <NoMatchRow colSpan={5} text={noMatchText(search, 'teacher')} inputId="search-teachers" onClear={() => setSearch('')} />
                   ) : (
-                    teachers.map((teacher) => (
+                    shownTeachers.map((teacher) => (
                       <tr key={teacher.id} className={`${cards.row} ${editing?.id === teacher.id || timesOffOf?.id === teacher.id ? 'bg-blue-50' : 'hover:bg-gray-50 transition-colors'}`}>
                         <td className={`${cards.title} font-medium text-gray-900`}>{teacher.name}</td>
                         <td className={`${cards.cell} text-gray-600`}>

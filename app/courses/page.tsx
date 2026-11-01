@@ -7,6 +7,8 @@ import { Notice, type NoticeMessage } from '@/components/notice';
 import { courseSchema, type CourseFormValues } from '@/lib/validations/course';
 import { StatusRow } from '@/components/status-message';
 import { TABLE_CARDS } from '@/lib/table-cards';
+import { NoMatchRow, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -26,6 +28,8 @@ export default function CoursesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The course shown in the form for changes (null: the form adds a new course),
   // and the course waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Course | null>(null);
@@ -150,6 +154,14 @@ export default function CoursesPage() {
       setToDelete(null);
     }
   };
+
+  // The courses that have what is typed in the search box, in their code, title or kinds of
+  // class (Breakdown).
+  const shownCourses = filterBySearch(courses, search, (course) => [
+    course.code,
+    course.title,
+    ...course.componentsTemplate.map((comp) => comp.type),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -304,9 +316,15 @@ export default function CoursesPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden h-fit">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-semibold text-gray-800">Existing Courses</h2>
-            </div>
+            <TableSearchBar
+              title="Existing Courses"
+              inputId="search-courses"
+              label="Search courses"
+              placeholder="Code or title"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownCourses.length, courses.length, search, 'course', 'courses')}
+            />
             
             <div className="@container overflow-x-auto">
               <table className={`w-full text-left border-collapse ${cards.table}`}>
@@ -332,8 +350,10 @@ export default function CoursesPage() {
                     />
                   ) : courses.length === 0 ? (
                     <tr><td colSpan={6} className="p-8 text-center text-gray-500">No courses defined yet.</td></tr>
+                  ) : shownCourses.length === 0 ? (
+                    <NoMatchRow colSpan={6} text={noMatchText(search, 'course')} inputId="search-courses" onClear={() => setSearch('')} />
                   ) : (
-                    courses.map((course) => (
+                    shownCourses.map((course) => (
                       <tr key={course.id} className={`${cards.row} ${editing?.id === course.id ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}>
                         <td className={`${cards.title} font-bold text-gray-900`}>{course.code}</td>
                         <td className={`${cards.cell} text-gray-700`}>

@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Notice, type NoticeMessage } from '@/components/notice';
 import { StatusBlock } from '@/components/status-message';
+import { NoMatchBlock, TableSearchBar } from '@/components/table-search';
+import { filterBySearch, noMatchText, searchCount } from '@/lib/table-search';
 import { getErrorMessage } from '@/lib/api-error';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
@@ -112,6 +114,8 @@ export default function CourseOfferingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<NoticeMessage | null>(null);
+  // What is typed in the search box above the list (see lib/table-search.ts).
+  const [search, setSearch] = useState('');
   // The offering shown in the form for changes (null: the form adds a new one),
   // and the offering waiting in the "Delete?" window.
   const [editing, setEditing] = useState<Offering | null>(null);
@@ -359,6 +363,16 @@ export default function CourseOfferingsPage() {
     .filter((text): text is string => text !== null);
   const refusals = [...notFreeNow, ...overMaximum];
 
+  // The offerings that have what is typed in the search box, in their course, cohort, term
+  // or the teachers of their classes ("No teacher" finds the classes without one).
+  const shownOfferings = filterBySearch(offerings, search, (offering) => [
+    offering.course.code,
+    offering.course.title,
+    offering.cohort.name,
+    offering.term.name,
+    ...offering.classes.map((cls) => teacherName(cls.assignedProfessorId)),
+  ]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -583,9 +597,15 @@ export default function CourseOfferingsPage() {
 
           {/* RIGHT COLUMN: THE DATA TABLE */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-semibold text-gray-800">Generated Offerings & Pending Classes</h2>
-            </div>
+            <TableSearchBar
+              title="Generated Offerings & Pending Classes"
+              inputId="search-offerings"
+              label="Search offerings"
+              placeholder="Course, cohort, term or teacher"
+              value={search}
+              onChange={setSearch}
+              count={searchCount(shownOfferings.length, offerings.length, search, 'offering', 'offerings')}
+            />
             
             <div className="p-6 space-y-4 max-h-[700px] overflow-y-auto">
               {isLoading ? (
@@ -598,8 +618,10 @@ export default function CourseOfferingsPage() {
                 />
               ) : offerings.length === 0 ? (
                 <p className="text-gray-500 text-center">No assignments yet. Link a course to a cohort above.</p>
+              ) : shownOfferings.length === 0 ? (
+                <NoMatchBlock text={noMatchText(search, 'offering')} inputId="search-offerings" onClear={() => setSearch('')} />
               ) : (
-                offerings.map((offering) => (
+                shownOfferings.map((offering) => (
                   <div
                     key={offering.id}
                     className={

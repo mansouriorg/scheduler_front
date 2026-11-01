@@ -119,6 +119,18 @@ Open http://localhost:3000.
   smaller laptops. Each value then has its column name in front of it. The class names are
   in `lib/table-cards.ts` (`table-cards.test.mjs`; `tests/table-cards.test.mjs` checks the
   pages).
+- The Teachers, Classrooms, Courses and Course Offerings pages have a search box above
+  their list (`components/table-search.tsx`). It keeps the rows that have what is typed,
+  with or without capitals and accents: either as it is typed ("lab 3" finds "Lab 304"),
+  or word by word in any order and column ("sami fall" finds Sami's offerings in Fall
+  2026). A number among the words must be a whole number: "year 2" finds "SE - Year 2",
+  not "SE - Year 1" in "Fall 2026". It searches what the list shows: a teacher's name and
+  department; a room's name, type, building and floor, and equipment; a course's code,
+  title and kinds of class (TD, TP); an offering's course, cohort, term and teachers ("no
+  teacher" finds the offerings with a class that has none). Next to the title it says how
+  many rows it shows ("2 of 12 teachers"); screen readers read it out. Escape or "Clear
+  search" empties the box. The rules are in `lib/table-search.ts` (`table-search.test.mjs`;
+  `tests/table-search.test.mjs` checks the pages).
 - After Generate, the home page shows a short summary ("12 classes were placed in the
   timetable of Fall 2026.") and, as a list under it, the notes from brain_server: the
   classes on Saturday, before their lecture, or outside the time their teacher prefers
